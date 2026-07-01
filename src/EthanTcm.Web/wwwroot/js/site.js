@@ -636,3 +636,40 @@
     renderLoading();
   });
 })();
+
+(() => {
+  const modalElement = document.getElementById("documentPreviewModal");
+  if (!modalElement || !window.bootstrap?.Modal) {
+    return;
+  }
+
+  const modal = new window.bootstrap.Modal(modalElement);
+  const modalTitle = modalElement.querySelector(".modal-title");
+  const documentType = modalElement.querySelector(".document-preview-type");
+  const frame = modalElement.querySelector(".document-preview-frame");
+  const downloadLink = modalElement.querySelector(".document-preview-download");
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-document-preview]");
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    const previewUrl = button.dataset.documentPreviewUrl;
+    const downloadUrl = button.dataset.documentDownloadUrl || previewUrl;
+    if (!previewUrl) {
+      return;
+    }
+
+    modalTitle.textContent = button.dataset.documentTitle || "Document preview";
+    documentType.textContent = button.dataset.documentType || "Document";
+    downloadLink.href = downloadUrl;
+    frame.src = previewUrl;
+    modal.show();
+  });
+
+  modalElement.addEventListener("hidden.bs.modal", () => {
+    frame.removeAttribute("src");
+  });
+})();

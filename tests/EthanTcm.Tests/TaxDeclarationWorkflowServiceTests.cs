@@ -224,6 +224,45 @@ public sealed class TaxDeclarationWorkflowServiceTests
     }
 
     [Fact]
+    public async Task Configured_payment_process_owner_can_record_payment()
+    {
+        var options = CreateOptions();
+        var setup = await CreateDeclarationReadyForSubmissionAsync(options, paymentRequired: true);
+        await using var dbContext = CreateDbContext(options);
+        var managerService = CreateService(dbContext, Guid.NewGuid(), ApplicationRoles.TaxManager);
+
+        await UploadDocumentAsync(dbContext, setup.DeclarationId, DocumentType.SubmissionProof);
+        var submitted = await managerService.MarkSubmittedAsync(setup.DeclarationId, "SUB-001");
+        await UploadDocumentAsync(dbContext, setup.DeclarationId, DocumentType.PaymentProof);
+        var paymentOwnerService = CreateService(dbContext, setup.PreparerId, ApplicationRoles.Preparer);
+        var paid = await paymentOwnerService.MarkPaidAsync(setup.DeclarationId, 1200m, "USD", "PAY-001");
+
+        Assert.True(submitted.Success, submitted.ErrorMessage);
+        Assert.True(paid.Success, paid.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Configured_follow_up_owner_can_close_declaration()
+    {
+        var options = CreateOptions();
+        var setup = await CreateDeclarationReadyForSubmissionAsync(options, paymentRequired: true);
+        await using var dbContext = CreateDbContext(options);
+        var managerService = CreateService(dbContext, Guid.NewGuid(), ApplicationRoles.TaxManager);
+
+        await UploadDocumentAsync(dbContext, setup.DeclarationId, DocumentType.SubmissionProof);
+        await UploadDocumentAsync(dbContext, setup.DeclarationId, DocumentType.PaymentProof);
+        var submitted = await managerService.MarkSubmittedAsync(setup.DeclarationId, "SUB-001");
+        var paid = await CreateService(dbContext, setup.PreparerId, ApplicationRoles.Preparer)
+            .MarkPaidAsync(setup.DeclarationId, 1200m, "USD", "PAY-001");
+        var closed = await CreateService(dbContext, setup.PreparerId, ApplicationRoles.Preparer)
+            .CloseAsync(setup.DeclarationId);
+
+        Assert.True(submitted.Success, submitted.ErrorMessage);
+        Assert.True(paid.Success, paid.ErrorMessage);
+        Assert.True(closed.Success, closed.ErrorMessage);
+    }
+
+    [Fact]
     public async Task Workflow_records_actual_submission_payment_and_closure_actors()
     {
         var options = CreateOptions();
@@ -438,6 +477,8 @@ public sealed class TaxDeclarationWorkflowServiceTests
         obligation.AddResponsible(approver1.Id, ResponsibleType.Approver1, DateTimeOffset.UtcNow);
         obligation.AddResponsible(approver2.Id, ResponsibleType.Approver2, DateTimeOffset.UtcNow);
         obligation.AddResponsible(approver3.Id, ResponsibleType.Approver3, DateTimeOffset.UtcNow);
+        obligation.AddResponsible(preparer.Id, ResponsibleType.PaymentProcessOwner, DateTimeOffset.UtcNow);
+        obligation.AddResponsible(preparer.Id, ResponsibleType.FollowUpOwner, DateTimeOffset.UtcNow);
         var period = new TaxPeriod(2026, 1, null, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), "2026-01");
         var declaration = new TaxDeclaration(
             obligation.Id,
@@ -475,8 +516,8 @@ public sealed class TaxDeclarationWorkflowServiceTests
             .Where(declaration => declaration.Id == taxDeclarationId)
             .Select(declaration => declaration.AssignedToUserId)
             .SingleAsync();
-        var uploadUserId = documentType == DocumentType.PaymentProof ? Guid.NewGuid() : assignedToUserId;
-        var uploadRole = documentType == DocumentType.PaymentProof ? ApplicationRoles.FinanceManager : ApplicationRoles.Preparer;
+        var uploadUserId = assignedToUserId;
+        var uploadRole = ApplicationRoles.Preparer;
 
         var service = new TaxDocumentService(
             dbContext,

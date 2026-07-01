@@ -50,6 +50,8 @@ public sealed class TaxDocumentService(
 
         var declaration = await dbContext.TaxDeclarations
             .AsNoTracking()
+            .Include(item => item.TaxObligation)
+            .ThenInclude(obligation => obligation!.Responsibles)
             .FirstOrDefaultAsync(item => item.Id == command.TaxDeclarationId, cancellationToken);
         if (declaration is null)
         {
@@ -62,7 +64,7 @@ public sealed class TaxDocumentService(
             return FailedUpload("Current user is required.");
         }
 
-        if (!CanUpload(declaration.AssignedToUserId, command.DocumentType))
+        if (!CanUpload(declaration, command.DocumentType))
         {
             return FailedUpload("The current user is not allowed to upload this document.");
         }
@@ -230,7 +232,7 @@ public sealed class TaxDocumentService(
         }
     }
 
-    private bool CanUpload(Guid assignedToUserId, DocumentType documentType)
+    private bool CanUpload(TaxDeclaration declaration, DocumentType documentType)
     {
         if (currentUserService.IsInRole(ApplicationRoles.Administrator) ||
             currentUserService.IsInRole(ApplicationRoles.TaxManager))
@@ -240,11 +242,19 @@ public sealed class TaxDocumentService(
 
         if (documentType == DocumentType.PaymentProof)
         {
-            return currentUserService.IsInRole(ApplicationRoles.FinanceManager);
+            if (currentUserService.IsInRole(ApplicationRoles.FinanceManager))
+            {
+                return true;
+            }
+
+            return currentUserService.UserId.HasValue &&
+                declaration.TaxObligation?.Responsibles.Any(responsible =>
+                    responsible.Type == ResponsibleType.PaymentProcessOwner &&
+                    responsible.UserId == currentUserService.UserId.Value) == true;
         }
 
         return currentUserService.IsInRole(ApplicationRoles.Preparer) &&
-            currentUserService.UserId == assignedToUserId;
+            currentUserService.UserId == declaration.AssignedToUserId;
     }
 
     private bool CanDownload(TaxDeclaration declaration, Guid uploadedByUserId, DocumentType documentType)

@@ -228,7 +228,9 @@ public sealed class TaxDeclarationWorkflowService(
             declaration.ClosedByUserId.HasValue ? users.GetValueOrDefault(declaration.ClosedByUserId.Value, "-") : "-",
             FormatResponsibleNames(expectedSubmissionOwnerIds, users, "No submission owner configured"),
             FormatResponsibleNames(expectedPaymentOwnerIds, users, declaration.PaymentRequired ? "No payment owner configured" : "Not required"),
+            CanRecordPayment(declaration),
             FormatResponsibleNames(expectedClosureOwnerIds, users, "Tax manager"),
+            CanCloseDeclaration(declaration),
             approvalSteps,
             approvals,
             declaration.Payments
@@ -308,7 +310,7 @@ public sealed class TaxDeclarationWorkflowService(
     {
         return ExecuteAsync(taxDeclarationId, "MarkPaid", declaration =>
         {
-            EnsureRole(ApplicationRoles.FinanceManager, ApplicationRoles.TaxManager, ApplicationRoles.Administrator);
+            EnsureCanRecordPayment(declaration);
             EnsureActiveDocument(declaration, DocumentType.PaymentProof, "Payment proof is required before marking a declaration as paid.");
             declaration.AddPayment(amount, currency, paymentReference, DateTimeOffset.UtcNow, RequireCurrentUserId());
         }, cancellationToken);
@@ -380,7 +382,7 @@ public sealed class TaxDeclarationWorkflowService(
     {
         return ExecuteAsync(taxDeclarationId, "Close", declaration =>
         {
-            EnsureRole(ApplicationRoles.TaxManager, ApplicationRoles.Administrator);
+            EnsureCanCloseDeclaration(declaration);
             declaration.Close(DateTimeOffset.UtcNow, RequireCurrentUserId());
         }, cancellationToken);
     }
@@ -640,6 +642,68 @@ public sealed class TaxDeclarationWorkflowService(
         {
             throw new InvalidOperationException("Only the assigned preparer can submit this declaration.");
         }
+    }
+
+    private bool CanRecordPayment(TaxDeclaration declaration)
+    {
+        if (!declaration.PaymentRequired ||
+            declaration.Status != TaxDeclarationStatus.PaymentPending ||
+            !currentUserService.UserId.HasValue)
+        {
+            return false;
+        }
+
+        if (currentUserService.IsInRole(ApplicationRoles.Administrator) ||
+            currentUserService.IsInRole(ApplicationRoles.TaxManager) ||
+            currentUserService.IsInRole(ApplicationRoles.FinanceManager))
+        {
+            return true;
+        }
+
+        var currentUserId = currentUserService.UserId.Value;
+        return declaration.TaxObligation?.Responsibles.Any(responsible =>
+            responsible.Type == ResponsibleType.PaymentProcessOwner &&
+            responsible.UserId == currentUserId) == true;
+    }
+
+    private void EnsureCanRecordPayment(TaxDeclaration declaration)
+    {
+        if (CanRecordPayment(declaration))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Only the configured payment process owner, finance manager, tax manager or administrator can record payment.");
+    }
+
+    private bool CanCloseDeclaration(TaxDeclaration declaration)
+    {
+        if (declaration.Status is not (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid) ||
+            !currentUserService.UserId.HasValue)
+        {
+            return false;
+        }
+
+        if (currentUserService.IsInRole(ApplicationRoles.Administrator) ||
+            currentUserService.IsInRole(ApplicationRoles.TaxManager))
+        {
+            return true;
+        }
+
+        var currentUserId = currentUserService.UserId.Value;
+        return declaration.TaxObligation?.Responsibles.Any(responsible =>
+            responsible.Type == ResponsibleType.FollowUpOwner &&
+            responsible.UserId == currentUserId) == true;
+    }
+
+    private void EnsureCanCloseDeclaration(TaxDeclaration declaration)
+    {
+        if (CanCloseDeclaration(declaration))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Only the configured follow-up owner, tax manager or administrator can close this declaration.");
     }
 
     private static void EnsureActiveDocument(TaxDeclaration declaration, DocumentType documentType, string message)

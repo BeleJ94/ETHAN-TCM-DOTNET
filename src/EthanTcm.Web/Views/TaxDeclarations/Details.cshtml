@@ -10,7 +10,7 @@
     var canPrepare = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.PrepareTaxDeclarations)).Succeeded;
     var canApprove = declaration.ApprovalSteps.Any(step => step.CanAct) ||
         (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ApproveTaxDeclarations)).Succeeded;
-    var canManagePayments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ManageTaxPayments)).Succeeded;
+    var canManagePayments = declaration.CanRecordPayment;
     var canUploadDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.UploadTaxDocuments)).Succeeded;
     var canDownloadDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.DownloadTaxDocuments)).Succeeded;
     var canDeleteDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.DeleteTaxDocuments)).Succeeded;
@@ -43,6 +43,7 @@
         .FirstOrDefault();
     var hasPaymentRecord = declaration.Payments.Any();
     var canClose = hasSubmissionProof && (!declaration.PaymentRequired || (hasPaymentProof && hasPaymentRecord));
+    var canCloseAction = canClose && declaration.CanCloseDeclaration;
     var stageIndex = GetStageIndex(declaration.Status, declaration.PaymentRequired);
     var isPrepared = declaration.Status is not TaxDeclarationStatus.ToPrepare and not TaxDeclarationStatus.InPreparation;
     var isApprovalComplete = declaration.Status is TaxDeclarationStatus.ReadyForSubmission
@@ -199,42 +200,110 @@
                 </div>
 
                 <div class="stage-action-grid">
-                    <div class="stage-action-card @(stageIndex == 0 ? "stage-action-active" : string.Empty)">
+                    <div class="stage-action-card evidence-stage-card @(stageIndex == 0 ? "stage-action-active" : string.Empty)">
                         <div>
                             <span class="stage-kicker">Preparation</span>
                             <h3>Prepare and submit for review</h3>
                             <p>Start the file, complete the working data and send it to approvers.</p>
-                            <dl class="stage-meta-list">
-                                <dt>Assigned preparer</dt>
+                            <dl class="stage-meta-list responsibility-meta-list">
+                                <dt>Expected</dt>
                                 <dd>@declaration.AssignedTo</dd>
-                                <dt>Actual preparer</dt>
+                                <dt>Actual</dt>
                                 <dd>@declaration.PreparedBy</dd>
-                                <dt>Prepared at</dt>
+                                <dt>Date</dt>
                                 <dd>@(declaration.PreparedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                                <dt>Preparation proof</dt>
-                                <dd>@(preparationProof?.FileName ?? "-")</dd>
+                                <dt>Evidence</dt>
+                                <dd>
+                                    @if (preparationProof is null)
+                                    {
+                                        @("-")
+                                    }
+                                    else
+                                    {
+                                        <span class="document-evidence-link">
+                                            <span>@preparationProof.FileName</span>
+                                            @if (canDownloadDocuments)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                        data-document-preview
+                                                        data-document-title="@preparationProof.FileName"
+                                                        data-document-type="@preparationProof.ContentType"
+                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = preparationProof.Id })"
+                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = preparationProof.Id })">
+                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                </button>
+                                            }
+                                        </span>
+                                    }
+                                </dd>
                             </dl>
                         </div>
-                        <div class="form-actions">
-                            @if (canPrepare && declaration.Status == TaxDeclarationStatus.ToPrepare)
-                            {
-                                <form method="post" asp-action="StartPreparation" class="js-confirm-ajax-form" data-confirm-title="Start preparation">
-                                    <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
-                                    <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-edit"></use></svg>Start preparation</button>
-                                </form>
-                            }
-                            @if (canPrepare && declaration.Status is (TaxDeclarationStatus.InPreparation or TaxDeclarationStatus.Rejected))
-                            {
-                                <form method="post" asp-action="SubmitForReview" enctype="multipart/form-data" class="js-confirm-ajax-form" data-confirm-title="Submit for review">
-                                    <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
-                                    <div>
-                                        <label class="form-label" for="PreparationProofUpload">Preparation proof</label>
-                                        <input id="PreparationProofUpload" class="form-control" name="Upload" type="file" required />
-                                    </div>
-                                    <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Submit for review</button>
-                                </form>
-                            }
-                        </div>
+                        @if (canPrepare && declaration.Status == TaxDeclarationStatus.ToPrepare)
+                        {
+                            <form method="post" asp-action="StartPreparation" class="stage-single-action js-confirm-ajax-form" data-confirm-title="Start preparation">
+                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-edit"></use></svg>Start preparation</button>
+                            </form>
+                        }
+                        else if (canPrepare && declaration.Status is (TaxDeclarationStatus.InPreparation or TaxDeclarationStatus.Rejected))
+                        {
+                            <form method="post" asp-action="SubmitForReview" enctype="multipart/form-data" class="operational-action-form evidence-action-form js-confirm-ajax-form" data-confirm-title="Submit for review">
+                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                <div>
+                                    <label class="form-label" for="PreparationProofUpload">Preparation proof</label>
+                                    <input id="PreparationProofUpload" class="form-control" name="Upload" type="file" required />
+                                </div>
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Submit for review</button>
+                            </form>
+                        }
+                        else if (isPrepared)
+                        {
+                            <div class="stage-complete-summary">
+                                <div class="stage-complete-header">
+                                    <span class="status-pill status-active">
+                                        <svg class="icon"><use href="#icon-check"></use></svg>
+                                        Preparation completed
+                                    </span>
+                                </div>
+                                <dl class="stage-complete-facts">
+                                    <dt>Prepared by</dt>
+                                    <dd>@(string.IsNullOrWhiteSpace(declaration.PreparedBy) ? "-" : declaration.PreparedBy)</dd>
+                                    <dt>Prepared on</dt>
+                                    <dd>@(declaration.PreparedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                    <dt>Proof</dt>
+                                    <dd>
+                                        @if (preparationProof is null)
+                                        {
+                                            @("-")
+                                        }
+                                        else
+                                        {
+                                            <span class="document-evidence-link">
+                                                <span>@preparationProof.FileName</span>
+                                                @if (canDownloadDocuments)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                            data-document-preview
+                                                            data-document-title="@preparationProof.FileName"
+                                                            data-document-type="@preparationProof.ContentType"
+                                                            data-document-preview-url="@Url.Action("PreviewDocument", new { id = preparationProof.Id })"
+                                                            data-document-download-url="@Url.Action("DownloadDocument", new { id = preparationProof.Id })">
+                                                        <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                    </button>
+                                                }
+                                            </span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stage-action-note">
+                                <strong>Preparer action required</strong>
+                                <span>The assigned preparer must start or complete this declaration before review.</span>
+                            </div>
+                        }
                     </div>
 
                     <div class="stage-action-card approval-chain-card @(stageIndex == 1 ? "stage-action-active" : string.Empty)">
@@ -284,7 +353,7 @@
                         </div>
                     </div>
 
-                    <div class="stage-action-card @(stageIndex == 2 ? "stage-action-active" : string.Empty)">
+                    <div class="stage-action-card evidence-stage-card @(stageIndex == 2 ? "stage-action-active" : string.Empty)">
                         <div>
                             <span class="stage-kicker">Submission</span>
                             <h3>Submit to the authority</h3>
@@ -297,20 +366,106 @@
                                 <dt>Date</dt>
                                 <dd>@(declaration.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
                                 <dt>Evidence</dt>
-                                <dd>@(submissionProof?.FileName ?? "-")</dd>
+                                <dd>
+                                    @if (submissionProof is null)
+                                    {
+                                        @("-")
+                                    }
+                                    else
+                                    {
+                                        <span class="document-evidence-link">
+                                            <span>@submissionProof.FileName</span>
+                                            @if (canDownloadDocuments)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                        data-document-preview
+                                                        data-document-title="@submissionProof.FileName"
+                                                        data-document-type="@submissionProof.ContentType"
+                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = submissionProof.Id })"
+                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = submissionProof.Id })">
+                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                </button>
+                                            }
+                                        </span>
+                                    }
+                                </dd>
                             </dl>
                         </div>
                         @if (canPrepare && declaration.Status is (TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission))
                         {
-                            <form method="post" asp-action="MarkSubmitted" class="inline-action-form js-confirm-ajax-form" data-confirm-title="Mark submitted">
+                            <form method="post" asp-action="MarkSubmitted" enctype="multipart/form-data" class="operational-action-form evidence-action-form js-confirm-ajax-form" data-confirm-title="Mark submitted">
                                 <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
-                                <input class="form-control" asp-for="Action.SubmissionReference" name="SubmissionReference" placeholder="Submission reference" />
-                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Mark submitted</button>
+                                <div>
+                                    <label class="form-label" asp-for="Action.SubmissionReference">Submission reference</label>
+                                    <input class="form-control" asp-for="Action.SubmissionReference" name="SubmissionReference" placeholder="Tax authority reference" required />
+                                </div>
+                                <div>
+                                    <label class="form-label" asp-for="Action.Upload">Submission proof</label>
+                                    @if (hasSubmissionProof)
+                                    {
+                                        <input class="form-control" asp-for="Action.Upload" name="Upload" type="file" />
+                                    }
+                                    else
+                                    {
+                                        <input class="form-control" asp-for="Action.Upload" name="Upload" type="file" required />
+                                    }
+                                </div>
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Attach proof and mark submitted</button>
                             </form>
+                        }
+                        else if (isSubmitted)
+                        {
+                            <div class="stage-complete-summary">
+                                <div class="stage-complete-header">
+                                    <span class="status-pill status-active">
+                                        <svg class="icon"><use href="#icon-check"></use></svg>
+                                        Submission completed
+                                    </span>
+                                </div>
+                                <dl class="stage-complete-facts">
+                                    <dt>Reference</dt>
+                                    <dd>@(string.IsNullOrWhiteSpace(declaration.SubmissionReference) ? "-" : declaration.SubmissionReference)</dd>
+                                    <dt>Submitted by</dt>
+                                    <dd>@(string.IsNullOrWhiteSpace(declaration.SubmittedBy) ? "-" : declaration.SubmittedBy)</dd>
+                                    <dt>Submitted on</dt>
+                                    <dd>@(declaration.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                    <dt>Proof</dt>
+                                    <dd>
+                                        @if (submissionProof is null)
+                                        {
+                                            @("-")
+                                        }
+                                        else
+                                        {
+                                            <span class="document-evidence-link">
+                                                <span>@submissionProof.FileName</span>
+                                                @if (canDownloadDocuments)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                            data-document-preview
+                                                            data-document-title="@submissionProof.FileName"
+                                                            data-document-type="@submissionProof.ContentType"
+                                                            data-document-preview-url="@Url.Action("PreviewDocument", new { id = submissionProof.Id })"
+                                                            data-document-download-url="@Url.Action("DownloadDocument", new { id = submissionProof.Id })">
+                                                        <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                    </button>
+                                                }
+                                            </span>
+                                        }
+                                    </dd>
+                                </dl>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stage-action-note">
+                                <strong>Available after approval</strong>
+                                <span>The submission form appears once all approval levels are completed.</span>
+                            </div>
                         }
                     </div>
 
-                    <div class="stage-action-card @(stageIndex == 3 ? "stage-action-active" : string.Empty)">
+                    <div class="stage-action-card evidence-stage-card @(stageIndex == 3 ? "stage-action-active" : string.Empty)">
                         <div>
                             <span class="stage-kicker">Payment</span>
                             <h3>Confirm fiscal payment</h3>
@@ -323,22 +478,137 @@
                                 <dt>Date</dt>
                                 <dd>@(latestPayment?.PaidAt.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
                                 <dt>Evidence</dt>
-                                <dd>@(paymentProof?.FileName ?? "-")</dd>
+                                <dd>
+                                    @if (paymentProof is null)
+                                    {
+                                        @("-")
+                                    }
+                                    else
+                                    {
+                                        <span class="document-evidence-link">
+                                            <span>@paymentProof.FileName</span>
+                                            @if (canDownloadDocuments)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                        data-document-preview
+                                                        data-document-title="@paymentProof.FileName"
+                                                        data-document-type="@paymentProof.ContentType"
+                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = paymentProof.Id })"
+                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = paymentProof.Id })">
+                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                </button>
+                                            }
+                                        </span>
+                                    }
+                                </dd>
                             </dl>
                         </div>
                         @if (canManagePayments && declaration.PaymentRequired && declaration.Status == TaxDeclarationStatus.PaymentPending)
                         {
-                            <form method="post" asp-action="MarkPaid" class="payment-action-form js-confirm-ajax-form" data-confirm-title="Mark paid">
+                            <form method="post" asp-action="MarkPaid" enctype="multipart/form-data" class="operational-action-form payment-action-form evidence-action-form js-confirm-ajax-form" data-confirm-title="Mark paid">
                                 <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
-                                <input class="form-control" asp-for="Action.Amount" name="Amount" type="number" min="0.01" step="0.01" placeholder="Amount" />
-                                <input class="form-control" asp-for="Action.Currency" name="Currency" placeholder="Currency" />
-                                <input class="form-control" asp-for="Action.PaymentReference" name="PaymentReference" placeholder="Payment reference" />
-                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-credit-card"></use></svg>Mark paid</button>
+                                <div>
+                                    <label class="form-label" asp-for="Action.Amount">Amount</label>
+                                    <input class="form-control" asp-for="Action.Amount" name="Amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+                                </div>
+                                <div>
+                                    <label class="form-label" for="PaymentCurrency">Currency</label>
+                                    <select id="PaymentCurrency" class="form-select" name="Currency">
+                                        <option value="USD" selected>USD</option>
+                                        <option value="CDF">CDF</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="ZAR">ZAR</option>
+                                        <option value="GBP">GBP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" asp-for="Action.PaymentReference">Payment reference</label>
+                                    <input class="form-control" asp-for="Action.PaymentReference" name="PaymentReference" placeholder="Banking or fiscal reference" required />
+                                </div>
+                                <div>
+                                    <label class="form-label" asp-for="Action.Upload">Payment proof</label>
+                                    @if (hasPaymentProof)
+                                    {
+                                        <input class="form-control" asp-for="Action.Upload" name="Upload" type="file" />
+                                    }
+                                    else
+                                    {
+                                        <input class="form-control" asp-for="Action.Upload" name="Upload" type="file" required />
+                                    }
+                                </div>
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-credit-card"></use></svg>Attach proof and mark paid</button>
                             </form>
+                        }
+                        else
+                        {
+                            @if (!declaration.PaymentRequired)
+                            {
+                                <div class="stage-action-note">
+                                    <strong>No payment required</strong>
+                                    <span>This declaration can move to closure once submission evidence is complete.</span>
+                                </div>
+                            }
+                            else if (declaration.Status == TaxDeclarationStatus.PaymentPending)
+                            {
+                                <div class="stage-action-note">
+                                    <strong>Finance action required</strong>
+                                    <span>Only the configured payment process owner, Finance Manager, Tax Manager or Administrator can record payment and attach proof.</span>
+                                </div>
+                            }
+                            else if (declaration.Status is TaxDeclarationStatus.Paid or TaxDeclarationStatus.Closed)
+                            {
+                                <div class="stage-complete-summary">
+                                    <div class="stage-complete-header">
+                                        <span class="status-pill status-active">
+                                            <svg class="icon"><use href="#icon-check"></use></svg>
+                                            Payment completed
+                                        </span>
+                                    </div>
+                                    <dl class="stage-complete-facts">
+                                        <dt>Amount</dt>
+                                        <dd>@(latestPayment is null ? "-" : $"{latestPayment.Amount:N2} {latestPayment.Currency}")</dd>
+                                        <dt>Reference</dt>
+                                        <dd>@(string.IsNullOrWhiteSpace(latestPayment?.PaymentReference) ? "-" : latestPayment.PaymentReference)</dd>
+                                        <dt>Paid on</dt>
+                                        <dd>@(latestPayment?.PaidAt.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                        <dt>Proof</dt>
+                                        <dd>
+                                            @if (paymentProof is null)
+                                            {
+                                                @("-")
+                                            }
+                                            else
+                                            {
+                                                <span class="document-evidence-link">
+                                                    <span>@paymentProof.FileName</span>
+                                                    @if (canDownloadDocuments)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                                data-document-preview
+                                                                data-document-title="@paymentProof.FileName"
+                                                                data-document-type="@paymentProof.ContentType"
+                                                                data-document-preview-url="@Url.Action("PreviewDocument", new { id = paymentProof.Id })"
+                                                                data-document-download-url="@Url.Action("DownloadDocument", new { id = paymentProof.Id })">
+                                                            <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                                        </button>
+                                                    }
+                                                </span>
+                                            }
+                                        </dd>
+                                    </dl>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="stage-action-note">
+                                    <strong>Available after submission</strong>
+                                    <span>The payment form appears once the declaration is submitted and payment tracking is required.</span>
+                                </div>
+                            }
                         }
                     </div>
 
-                    <div class="stage-action-card @(stageIndex == 4 ? "stage-action-active" : string.Empty)">
+                    <div class="stage-action-card evidence-stage-card @(stageIndex == 4 ? "stage-action-active" : string.Empty)">
                         <div>
                             <span class="stage-kicker">Closure</span>
                             <h3>Close compliance cycle</h3>
@@ -354,12 +624,45 @@
                                 <dd><span class="status-pill @(canClose ? "status-active" : "status-warning")">@(canClose ? "Ready" : "Blocked")</span></dd>
                             </dl>
                         </div>
-                        @if (canManageLifecycle && declaration.Status is (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid))
+                        @if (canCloseAction && declaration.Status is (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid))
                         {
-                            <form method="post" asp-action="Close" class="js-confirm-ajax-form" data-confirm-title="Close declaration">
+                            <form method="post" asp-action="Close" class="stage-single-action js-confirm-ajax-form" data-confirm-title="Close declaration">
                                 <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
                                 <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-check"></use></svg>Close</button>
                             </form>
+                        }
+                        else if (isClosureComplete)
+                        {
+                            <div class="stage-complete-summary">
+                                <div class="stage-complete-header">
+                                    <span class="status-pill status-active">
+                                        <svg class="icon"><use href="#icon-check"></use></svg>
+                                        Closure completed
+                                    </span>
+                                </div>
+                                <dl class="stage-complete-facts">
+                                    <dt>Closed by</dt>
+                                    <dd>@(string.IsNullOrWhiteSpace(declaration.ClosedBy) ? "-" : declaration.ClosedBy)</dd>
+                                    <dt>Closed on</dt>
+                                    <dd>@(declaration.ClosedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                    <dt>Status</dt>
+                                    <dd>Compliance cycle closed</dd>
+                                </dl>
+                            </div>
+                        }
+                        else if (canClose && declaration.Status is (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid))
+                        {
+                            <div class="stage-action-note">
+                                <strong>Closure owner required</strong>
+                                <span>Only the configured follow-up owner, Tax Manager or Administrator can close this declaration.</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stage-action-note">
+                                <strong>Waiting for evidence</strong>
+                                <span>Closure becomes available once submission evidence and any required payment evidence are complete.</span>
+                            </div>
                         }
                     </div>
                 </div>
@@ -418,6 +721,14 @@
                                 <td class="text-end">
                                     @if (canDownloadDocuments)
                                     {
+                                        <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
+                                                data-document-preview
+                                                data-document-title="@document.FileName"
+                                                data-document-type="@document.ContentType"
+                                                data-document-preview-url="@Url.Action("PreviewDocument", new { id = document.Id })"
+                                                data-document-download-url="@Url.Action("DownloadDocument", new { id = document.Id })">
+                                            <svg class="icon"><use href="#icon-open"></use></svg>Preview
+                                        </button>
                                         <a class="btn btn-sm btn-outline-primary" asp-action="DownloadDocument" asp-route-id="@document.Id"><svg class="icon"><use href="#icon-download"></use></svg>Download</a>
                                     }
                                     @if (canDeleteDocuments)
@@ -556,6 +867,35 @@
         </aside>
     </section>
 </section>
+
+<div class="modal fade document-preview-modal" id="documentPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title fs-5">Document preview</h2>
+                    <span class="document-preview-type">-</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="document-preview-frame-wrap">
+                    <iframe class="document-preview-frame" title="Document preview"></iframe>
+                </div>
+                <div class="document-preview-fallback">
+                    <strong>Preview unavailable</strong>
+                    <span>If this file type cannot be displayed by the browser, download it to open it locally.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-outline-primary document-preview-download" href="#">
+                    <svg class="icon"><use href="#icon-download"></use></svg>Download
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @functions {
     private sealed record WorkflowStep(string Name, string Owner, string Description);

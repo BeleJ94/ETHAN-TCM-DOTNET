@@ -182,22 +182,44 @@ public sealed class TaxDeclarationsController(
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = ApplicationPermissions.PrepareTaxDeclarations)]
-    public Task<IActionResult> MarkSubmitted(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> MarkSubmitted(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
     {
-        return ExecuteWorkflowAction(model.TaxDeclarationId, () => workflowService.MarkSubmittedAsync(model.TaxDeclarationId, model.SubmissionReference, cancellationToken));
+        if (model.Upload is { Length: > 0 })
+        {
+            var uploadResult = await UploadDocumentInternalAsync(model, DocumentType.SubmissionProof, cancellationToken);
+            if (!uploadResult.Success)
+            {
+                return WorkflowResponse(model.TaxDeclarationId, false, uploadResult.ErrorMessage);
+            }
+        }
+
+        return await ExecuteWorkflowAction(
+            model.TaxDeclarationId,
+            () => workflowService.MarkSubmittedAsync(model.TaxDeclarationId, model.SubmissionReference, cancellationToken));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = ApplicationPermissions.ManageTaxPayments)]
-    public Task<IActionResult> MarkPaid(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
+    [Authorize(Policy = ApplicationPermissions.ViewTaxDeclarations)]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> MarkPaid(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
     {
         if (model.Amount < 0.01m)
         {
-            return Task.FromResult(WorkflowResponse(model.TaxDeclarationId, false, "Payment amount must be greater than or equal to 0.01."));
+            return WorkflowResponse(model.TaxDeclarationId, false, "Payment amount must be greater than or equal to 0.01.");
         }
 
-        return ExecuteWorkflowAction(
+        if (model.Upload is { Length: > 0 })
+        {
+            var uploadResult = await UploadDocumentInternalAsync(model, DocumentType.PaymentProof, cancellationToken);
+            if (!uploadResult.Success)
+            {
+                return WorkflowResponse(model.TaxDeclarationId, false, uploadResult.ErrorMessage);
+            }
+        }
+
+        return await ExecuteWorkflowAction(
             model.TaxDeclarationId,
             () => workflowService.MarkPaidAsync(model.TaxDeclarationId, model.Amount, model.Currency, model.PaymentReference, cancellationToken));
     }
@@ -240,6 +262,31 @@ public sealed class TaxDeclarationsController(
         return PhysicalFile(download.PhysicalPath, download.ContentType, download.FileName);
     }
 
+    [HttpGet]
+    [Authorize(Policy = ApplicationPermissions.DownloadTaxDocuments)]
+    public async Task<IActionResult> PreviewDocument(Guid id, CancellationToken cancellationToken)
+    {
+        var authorization = await documentService.CanDownloadAsync(id, cancellationToken);
+        if (!authorization.Exists)
+        {
+            return NotFound();
+        }
+
+        if (!authorization.IsAllowed)
+        {
+            return Forbid();
+        }
+
+        var download = await documentService.GetDownloadAsync(id, cancellationToken);
+        if (download is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers.ContentDisposition = $"inline; filename=\"{download.FileName}\"";
+        return PhysicalFile(download.PhysicalPath, download.ContentType);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = ApplicationPermissions.DeleteTaxDocuments)]
@@ -276,7 +323,7 @@ public sealed class TaxDeclarationsController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = ApplicationPermissions.ManageTaxDeclarationLifecycle)]
+    [Authorize(Policy = ApplicationPermissions.ViewTaxDeclarations)]
     public Task<IActionResult> Close(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
     {
         return ExecuteWorkflowAction(model.TaxDeclarationId, () => workflowService.CloseAsync(model.TaxDeclarationId, cancellationToken));
