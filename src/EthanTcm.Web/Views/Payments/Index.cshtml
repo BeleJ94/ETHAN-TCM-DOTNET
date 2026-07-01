@@ -1,0 +1,103 @@
+@using EthanTcm.Domain.Enums
+@model DashboardViewModel
+
+@{
+    var dashboard = Model.Dashboard;
+    var metrics = dashboard.Metrics;
+    var isPending = dashboard.ActiveView == DashboardView.PaymentPending;
+    var isLate = dashboard.ActiveView == DashboardView.LatePayments;
+    var isMissingProof = dashboard.ActiveView == DashboardView.MissingPaymentProof;
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>@ViewData["Title"]</h1>
+            <p>Focused payment follow-up for declarations requiring finance action.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-tabs" aria-label="Payment views">
+        <a class="dashboard-tab @(isPending ? "dashboard-tab-active" : string.Empty)" asp-action="Pending">Pending payments</a>
+        <a class="dashboard-tab @(isLate ? "dashboard-tab-active" : string.Empty)" asp-action="Late">Late payments</a>
+        <a class="dashboard-tab @(isMissingProof ? "dashboard-tab-active" : string.Empty)" asp-action="MissingProof">Missing payment proof</a>
+    </nav>
+
+    <section class="dashboard-metrics">
+        <a class="metric metric-link @(metrics.PendingPayments > 0 ? "metric-warning" : string.Empty)" asp-action="Pending">
+            <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
+            <span>Pending payments</span>
+            <strong>@metrics.PendingPayments</strong>
+        </a>
+        <a class="metric metric-link @(metrics.Late > 0 ? "metric-danger metric-blink" : string.Empty)" asp-action="Late">
+            <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
+            <span>Late items</span>
+            <strong>@metrics.Late</strong>
+        </a>
+        <a class="metric metric-link @(metrics.MissingPaymentProof > 0 ? "metric-warning" : string.Empty)" asp-action="MissingProof">
+            <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-paperclip"></use></svg></span>
+            <span>No payment proof</span>
+            <strong>@metrics.MissingPaymentProof</strong>
+        </a>
+        <a class="metric metric-link @(metrics.PenaltyRisk > 0 ? "metric-warning metric-blink" : string.Empty)" asp-controller="Home" asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview">
+            <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
+            <span>Penalty risk</span>
+            <strong>@metrics.PenaltyRisk</strong>
+        </a>
+    </section>
+
+    <section class="panel">
+        <div class="panel-title-row">
+            <h2>@ViewData["Title"]</h2>
+            <span class="panel-subtitle">@dashboard.Today.ToString("yyyy-MM-dd")</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle dashboard-table js-data-table" data-page-size="10">
+                <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Period</th>
+                    <th>Due date</th>
+                    <th>Status</th>
+                    <th>Issue</th>
+                    <th>Risk</th>
+                    <th>Assigned</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (!dashboard.Items.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-muted">No payment item for this view.</td>
+                    </tr>
+                }
+                @foreach (var item in dashboard.Items)
+                {
+                    var statusClass = item.Issue == "Late" ? "status-danger" :
+                        item.RiskLevel is RiskLevel.High or RiskLevel.Critical ? "status-warning" :
+                        "status-active";
+                    <tr>
+                        <td>@item.ObligationName</td>
+                        <td>@item.PeriodLabel</td>
+                        <td>@item.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td><span class="status-pill @statusClass">@item.Status</span></td>
+                        <td>
+                            <span class="status-pill @statusClass">@item.Issue</span>
+                            @if (item.DaysLate > 0)
+                            {
+                                <span class="text-muted ms-1">@item.DaysLate d</span>
+                            }
+                        </td>
+                        <td>@item.RiskLevel</td>
+                        <td>@item.AssignedTo</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-controller="TaxDeclarations" asp-action="Details" asp-route-id="@item.Id"><svg class="icon"><use href="#icon-open"></use></svg>Open</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>

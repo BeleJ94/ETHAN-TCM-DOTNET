@@ -1,0 +1,84 @@
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@model ManualTaxDeclarationViewModel
+
+@{
+    ViewData["Title"] = "Manual Tax Declaration";
+    var canGenerateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.GenerateTaxDeclarations)).Succeeded;
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Manual Tax Declaration</h1>
+            <p>Create an ad hoc declaration for obligations handled as needed.</p>
+        </div>
+        @if (canGenerateDeclarations)
+        {
+            <a class="btn btn-outline-secondary" asp-action="Generate"><svg class="icon"><use href="#icon-plus"></use></svg>Annual generation</a>
+        }
+    </div>
+
+    @if (TempData["StatusMessage"] is string message)
+    {
+        <div class="alert alert-success">@message</div>
+    }
+
+    <form method="post" class="panel form-grid">
+        <div asp-validation-summary="ModelOnly" class="text-danger form-wide"></div>
+
+        <div class="form-wide">
+            <label asp-for="TaxObligationId" class="form-label">Tax obligation</label>
+            <select asp-for="TaxObligationId" asp-items="Model.Obligations" class="form-select">
+                <option value="">Select obligation</option>
+            </select>
+            <span asp-validation-for="TaxObligationId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="PeriodLabel" class="form-label">Period label</label>
+            <input asp-for="PeriodLabel" class="form-control" placeholder="As needed - June 2026" />
+            <span asp-validation-for="PeriodLabel" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="AssignedToUserId" class="form-label">Assigned to</label>
+            <select asp-for="AssignedToUserId" asp-items="Model.Users" class="form-select">
+                <option value="">Select user</option>
+            </select>
+            <span asp-validation-for="AssignedToUserId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="PeriodDate" class="form-label">Period date</label>
+            <input asp-for="PeriodDate" class="form-control" type="date" />
+            <span asp-validation-for="PeriodDate" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="DueDate" class="form-label">Due date</label>
+            <input asp-for="DueDate" class="form-control" type="date" />
+            <span asp-validation-for="DueDate" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="ReminderDate" class="form-label">Reminder date</label>
+            <input asp-for="ReminderDate" class="form-control" type="date" />
+            <span asp-validation-for="ReminderDate" class="text-danger"></span>
+        </div>
+
+        <div class="form-check form-wide">
+            <input asp-for="IsNotApplicable" class="form-check-input" />
+            <label asp-for="IsNotApplicable" class="form-check-label">Create as NotApplicable</label>
+        </div>
+
+        <div class="form-wide form-actions">
+            <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-check"></use></svg>Create declaration</button>
+            <a class="btn btn-outline-secondary" asp-action="Index"><svg class="icon"><use href="#icon-x"></use></svg>Cancel</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,139 @@
+@model TaxObligationFormViewModel
+
+@{
+    var isEdit = Model.Id.HasValue;
+    ViewData["Title"] = isEdit ? "Edit Obligation" : "Create Obligation";
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>@ViewData["Title"]</h1>
+            <p>Maintain fiscal obligation metadata and responsibility assignments.</p>
+        </div>
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to list</a>
+    </div>
+
+    <form method="post" class="panel form-grid">
+        <div asp-validation-summary="ModelOnly" class="text-danger form-wide"></div>
+
+        <div class="form-wide">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <div class="form-wide">
+            <label asp-for="Description" class="form-label"></label>
+            <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="Description" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="DepartmentId" class="form-label">Department</label>
+            <select asp-for="DepartmentId" asp-items="Model.Departments" class="form-select">
+                <option value="">Select department</option>
+            </select>
+            <span asp-validation-for="DepartmentId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="TaxCategoryId" class="form-label">Tax category</label>
+            <select asp-for="TaxCategoryId" asp-items="Model.TaxCategories" class="form-select">
+                <option value="">Select category</option>
+            </select>
+            <span asp-validation-for="TaxCategoryId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="TaxFrequencyId" class="form-label">Frequency</label>
+            <select asp-for="TaxFrequencyId" asp-items="Model.TaxFrequencies" class="form-select">
+                <option value="">Select frequency</option>
+            </select>
+            <span asp-validation-for="TaxFrequencyId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="RiskLevel" class="form-label">Risk level</label>
+            <select asp-for="RiskLevel" asp-items="Model.RiskLevels" class="form-select"></select>
+            <span asp-validation-for="RiskLevel" class="text-danger"></span>
+        </div>
+
+        <div class="form-wide critical-field">
+            <div>
+                <span class="critical-field-kicker">Critical tax data</span>
+                <label asp-for="RequiresPayment" class="critical-field-label">Payment required</label>
+                <p class="critical-field-copy">When enabled, every generated declaration is tracked through payment and payment proof controls.</p>
+            </div>
+            <div class="form-check form-switch critical-field-control">
+                <input asp-for="RequiresPayment" class="form-check-input" />
+                <span class="critical-field-state">Required by default</span>
+            </div>
+        </div>
+
+        <h2 class="form-wide form-section-title">Responsibilities</h2>
+
+        <div>
+            <label asp-for="PreparerUserId" class="form-label">Preparer</label>
+            <select asp-for="PreparerUserId" asp-items="Model.Users" class="form-select">
+                <option value="">Select preparer</option>
+            </select>
+            <span asp-validation-for="PreparerUserId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="Approver1UserId" class="form-label">Approver 1</label>
+            <select asp-for="Approver1UserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+            <span asp-validation-for="Approver1UserId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="Approver2UserId" class="form-label">Approver 2</label>
+            <select asp-for="Approver2UserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+        </div>
+
+        <div>
+            <label asp-for="Approver3UserId" class="form-label">Approver 3</label>
+            <select asp-for="Approver3UserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+        </div>
+
+        <div>
+            <label asp-for="PaymentProcessOwnerUserId" class="form-label">Payment process owner</label>
+            <select asp-for="PaymentProcessOwnerUserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+            <span asp-validation-for="PaymentProcessOwnerUserId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="SubmissionProcessOwnerUserId" class="form-label">Submission process owner</label>
+            <select asp-for="SubmissionProcessOwnerUserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+            <span asp-validation-for="SubmissionProcessOwnerUserId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="FollowUpOwnerUserId" class="form-label">Follow-up owner</label>
+            <select asp-for="FollowUpOwnerUserId" asp-items="Model.Users" class="form-select">
+                <option value="">Optional</option>
+            </select>
+            <span asp-validation-for="FollowUpOwnerUserId" class="text-danger"></span>
+        </div>
+
+        <div class="form-wide form-actions">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

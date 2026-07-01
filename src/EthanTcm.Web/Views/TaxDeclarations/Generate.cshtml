@@ -1,0 +1,104 @@
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@model TaxDeclarationGenerationViewModel
+
+@{
+    ViewData["Title"] = "Generate Tax Declarations";
+    var canCreateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.CreateTaxDeclarations)).Succeeded;
+    var canManageTaxObligations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ManageTaxObligations)).Succeeded;
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Generate Tax Declarations</h1>
+            <p>Create concrete declarations from active fiscal obligations for a fiscal year.</p>
+        </div>
+        @if (canManageTaxObligations)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="TaxObligations" asp-action="Index"><svg class="icon"><use href="#icon-database"></use></svg>Tax referential</a>
+        }
+    </div>
+
+    <section class="panel">
+        <form method="post" class="filter-form">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input asp-for="FiscalYear" class="form-control" type="number" min="2000" max="2100" />
+            <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-plus"></use></svg>Generate annual declarations</button>
+            @if (canCreateDeclarations)
+            {
+                <a class="btn btn-outline-primary" asp-action="Manual"><svg class="icon"><use href="#icon-edit"></use></svg>Create manual declaration</a>
+            }
+        </form>
+        <span asp-validation-for="FiscalYear" class="text-danger"></span>
+    </section>
+
+    @if (Model.Result is not null)
+    {
+        <section class="panel">
+            <div class="metric-grid">
+                <div class="metric">
+                    <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
+                    <span>Fiscal year</span>
+                    <strong>@Model.Result.FiscalYear</strong>
+                </div>
+                <div class="metric">
+                    <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-check"></use></svg></span>
+                    <span>Created</span>
+                    <strong>@Model.Result.CreatedDeclarations</strong>
+                </div>
+                <div class="metric">
+                    <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-file"></use></svg></span>
+                    <span>Duplicates skipped</span>
+                    <strong>@Model.Result.SkippedDuplicates</strong>
+                </div>
+                <div class="metric">
+                    <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-x"></use></svg></span>
+                    <span>Inactive skipped</span>
+                    <strong>@Model.Result.SkippedInactiveObligations</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle js-data-table" data-page-size="10">
+                    <thead>
+                    <tr>
+                        <th>Obligation</th>
+                        <th>Period</th>
+                        <th>Due date</th>
+                        <th>Reminder</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Result.Items.Take(500))
+                    {
+                        <tr>
+                            <td>@item.ObligationName</td>
+                            <td>@item.PeriodLabel</td>
+                            <td>@item.DueDate.ToString("yyyy-MM-dd")</td>
+                            <td>@(item.ReminderDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>
+                                @if (item.Created)
+                                {
+                                    <span class="status-pill status-active">Created</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill status-inactive">@item.SkipReason</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,58 @@
+@model AdminSeedViewModel
+
+@{
+    ViewData["Title"] = "Admin Seed";
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Admin Seed</h1>
+            <p>Run controlled initialization for tax obligations from the embedded matrix data.</p>
+        </div>
+        <a class="btn btn-outline-secondary" asp-controller="TaxObligations" asp-action="Index">Tax referential</a>
+    </div>
+
+    <section class="panel">
+        <form method="post" asp-action="RunInitialTaxObligations" class="form-actions">
+            <button class="btn btn-primary" type="submit">Seed initial tax obligations</button>
+        </form>
+    </section>
+
+    @if (Model.Result is not null)
+    {
+        <section class="panel">
+            <div class="metric-grid">
+                <div class="metric">
+                    <span>Created</span>
+                    <strong>@Model.Result.Created</strong>
+                </div>
+                <div class="metric">
+                    <span>Updated</span>
+                    <strong>@Model.Result.Updated</strong>
+                </div>
+                <div class="metric">
+                    <span>Requires review</span>
+                    <strong>@Model.Result.RequiresReview</strong>
+                </div>
+                <div class="metric">
+                    <span>Errors</span>
+                    <strong>@Model.Result.Errors.Count</strong>
+                </div>
+            </div>
+        </section>
+
+        @if (Model.Result.Errors.Count > 0)
+        {
+            <section class="panel">
+                <h2>Errors</h2>
+                <ul>
+                    @foreach (var error in Model.Result.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+</section>

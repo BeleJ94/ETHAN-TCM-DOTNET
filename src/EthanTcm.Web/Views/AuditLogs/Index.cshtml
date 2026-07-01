@@ -1,0 +1,92 @@
+@model AuditLogIndexViewModel
+
+@{
+    ViewData["Title"] = "Audit Log";
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Audit Log</h1>
+            <p>Traceability of critical fiscal, workflow, document, import and notification actions.</p>
+        </div>
+    </div>
+
+    <form method="get" class="panel form-grid">
+        <div>
+            <label class="form-label" asp-for="Search">Search</label>
+            <input class="form-control" asp-for="Search" />
+        </div>
+        <div>
+            <label class="form-label" asp-for="Action">Action</label>
+            <input class="form-control" asp-for="Action" />
+        </div>
+        <div>
+            <label class="form-label" asp-for="EntityName">Entity</label>
+            <input class="form-control" asp-for="EntityName" />
+        </div>
+        <div>
+            <label class="form-label" asp-for="From">From</label>
+            <input class="form-control" asp-for="From" type="date" />
+        </div>
+        <div>
+            <label class="form-label" asp-for="To">To</label>
+            <input class="form-control" asp-for="To" type="date" />
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-search"></use></svg>Filter</button>
+            <a class="btn btn-outline-secondary" asp-action="Index"><svg class="icon"><use href="#icon-x"></use></svg>Reset</a>
+        </div>
+    </form>
+
+    <section class="panel">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle audit-table js-data-table" data-page-size="10">
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Source</th>
+                    <th>IP</th>
+                    <th>Values</th>
+                </tr>
+                </thead>
+                <tbody>
+                @if (!Model.Items.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-muted">No audit log found.</td>
+                    </tr>
+                }
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(item.UserDisplayName ?? item.UserId?.ToString() ?? "System")</td>
+                        <td><span class="status-pill status-inactive">@item.Action</span></td>
+                        <td>
+                            <strong>@item.EntityName</strong>
+                            <span class="audit-entity-id">@item.EntityId</span>
+                        </td>
+                        <td>@(item.Module ?? item.Source ?? "-")</td>
+                        <td>@(item.IpAddress ?? "-")</td>
+                        <td>
+                            <details>
+                                <summary>JSON</summary>
+                                <div class="audit-json-block">
+                                    <span>OldValues</span>
+                                    <pre>@(item.OldValues ?? "-")</pre>
+                                    <span>NewValues</span>
+                                    <pre>@(item.NewValues ?? "-")</pre>
+                                </div>
+                            </details>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>

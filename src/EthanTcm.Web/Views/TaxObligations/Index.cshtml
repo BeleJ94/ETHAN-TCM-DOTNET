@@ -1,0 +1,74 @@
+@model TaxObligationIndexViewModel
+
+@{
+    ViewData["Title"] = "Tax Referential";
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Tax Referential</h1>
+            <p>Manage fiscal obligations, ownership and operational responsibilities.</p>
+        </div>
+        <a class="btn btn-primary" asp-action="Create"><svg class="icon"><use href="#icon-plus"></use></svg>Create obligation</a>
+    </div>
+
+    <section class="panel">
+        <form method="get" class="filter-form">
+            <input class="form-control" name="search" value="@Model.Search" placeholder="Search obligations" />
+            <select class="form-select" name="departmentId" asp-items="Model.Departments">
+                <option value="">All departments</option>
+            </select>
+            <select class="form-select" name="taxCategoryId" asp-items="Model.TaxCategories">
+                <option value="">All categories</option>
+            </select>
+            <select class="form-select" name="taxFrequencyId" asp-items="Model.TaxFrequencies">
+                <option value="">All frequencies</option>
+            </select>
+            <select class="form-select" asp-for="IsActive">
+                <option value="">All statuses</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+            </select>
+            <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-search"></use></svg>Search</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle js-data-table" data-page-size="10">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Category</th>
+                    <th>Frequency</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.Name</td>
+                        <td>@item.Department</td>
+                        <td>@item.TaxCategory</td>
+                        <td>@item.Frequency</td>
+                        <td>@(item.RequiresPayment ? "Required" : "Not required")</td>
+                        <td>
+                            <span class="status-pill @(item.IsActive ? "status-active" : "status-inactive")">
+                                @(item.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id"><svg class="icon"><use href="#icon-open"></use></svg>Open</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>

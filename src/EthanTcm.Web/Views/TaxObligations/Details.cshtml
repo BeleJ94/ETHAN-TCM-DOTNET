@@ -1,0 +1,379 @@
+@model TaxObligationDetailsDto
+@using System.Globalization
+@using EthanTcm.Domain.Enums
+
+@{
+    ViewData["Title"] = Model.Name;
+    var currentVersion = Model.Versions.FirstOrDefault();
+    var statusClass = Model.IsActive ? "status-active" : "status-inactive";
+    var validationClass = Model.CatalogValidationStatus == TaxCatalogValidationStatus.Validated
+        ? "status-active"
+        : "status-warning";
+
+    string ResponsibleLabel(ResponsibleType type) => type switch
+    {
+        ResponsibleType.Primary => "Responsable historique",
+        ResponsibleType.Preparer => "Préparateur",
+        ResponsibleType.Backup => "Préparateur suppléant",
+        ResponsibleType.Approver1 => "Approbateur niveau 1",
+        ResponsibleType.Approver2 => "Approbateur niveau 2",
+        ResponsibleType.Approver3 => "Approbateur niveau 3",
+        ResponsibleType.PaymentProcessOwner => "Responsable paiement",
+        ResponsibleType.SubmissionProcessOwner => "Responsable soumission",
+        ResponsibleType.FollowUpOwner => "Responsable suivi / clôture",
+        ResponsibleType.Viewer => "Lecteur",
+        _ => "Approbateur"
+    };
+
+    string MonthLabel(int? month) => month is >= 1 and <= 12
+        ? CultureInfo.GetCultureInfo("fr-FR").DateTimeFormat.GetMonthName(month.Value)
+        : "Toute l’année";
+}
+
+<section class="page-shell tax-detail-page">
+    <div class="page-heading tax-detail-heading">
+        <div>
+            <div class="tax-detail-kicker">
+                <span class="status-pill @statusClass">@(Model.IsActive ? "Active" : "Inactive")</span>
+                <span class="status-pill @validationClass">@Model.CatalogValidationStatus</span>
+                @if (Model.RequiresReview)
+                {
+                    <span class="status-pill status-warning">Revue fiscale requise</span>
+                }
+            </div>
+            <h1>@Model.Name</h1>
+            <p>
+                <span class="tax-code">@(Model.CanonicalCode ?? "Code canonique non attribué")</span>
+                <span aria-hidden="true">•</span>
+                @Model.Department
+                <span aria-hidden="true">•</span>
+                @Model.TaxCategory
+            </p>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn-outline-secondary" asp-action="Index">Retour au référentiel</a>
+            <a class="btn btn-outline-primary" asp-action="CreateVersion" asp-route-id="@Model.Id">Nouvelle version fiscale</a>
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Modifier</a>
+        </div>
+    </div>
+
+    @if (Model.RequiresReview)
+    {
+        <div class="tax-review-banner" role="alert">
+            <strong>Validation fiscale nécessaire</strong>
+            <span>@(Model.ReviewReason ?? "Certaines informations du catalogue doivent être confirmées.")</span>
+        </div>
+    }
+
+    <div class="tax-metric-grid">
+        <article class="tax-metric">
+            <span>Fréquence</span>
+            <strong>@Model.Frequency</strong>
+            <small>@(currentVersion?.RawDeadlineText ?? Model.LegalDeadline ?? "Échéance non renseignée")</small>
+        </article>
+        <article class="tax-metric">
+            <span>Risque</span>
+            <strong>@Model.RiskLevel</strong>
+            <small>@(Model.RequiresPayment ? "Paiement suivi" : "Sans paiement")</small>
+        </article>
+        <article class="tax-metric">
+            <span>Déclarations</span>
+            <strong>@Model.DeclarationCount</strong>
+            <small>@Model.OpenDeclarationCount ouvertes</small>
+        </article>
+        <article class="tax-metric">
+            <span>Version fiscale</span>
+            <strong>@(currentVersion is null ? "—" : $"v{currentVersion.VersionNumber}")</strong>
+            <small>@(currentVersion?.EffectiveFrom.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo("fr-FR")) ?? "Non versionnée")</small>
+        </article>
+    </div>
+
+    <div class="tax-detail-grid">
+        <section class="panel tax-detail-card">
+            <div class="panel-title-row">
+                <div>
+                    <h2>Identité fiscale</h2>
+                    <p class="panel-subtitle">Informations de référence et périmètre.</p>
+                </div>
+            </div>
+            <dl class="tax-fact-list">
+                <div><dt>Code canonique</dt><dd>@(Model.CanonicalCode ?? "Non attribué")</dd></div>
+                <div><dt>Numéro source</dt><dd>@(Model.SourceNumber?.ToString() ?? "Non renseigné")</dd></div>
+                <div><dt>Département</dt><dd>@Model.Department</dd></div>
+                <div><dt>Catégorie</dt><dd>@Model.TaxCategory</dd></div>
+                <div><dt>Fréquence historique</dt><dd>@Model.Frequency</dd></div>
+                <div><dt>Échéance historique</dt><dd>@(Model.LegalDeadline ?? "Non renseignée")</dd></div>
+                <div><dt>Créée le</dt><dd>@Model.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd></div>
+                <div><dt>Dernière mise à jour</dt><dd>@(Model.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Jamais")</dd></div>
+            </dl>
+            @if (!string.IsNullOrWhiteSpace(Model.Description))
+            {
+                <div class="tax-note">
+                    <strong>Description</strong>
+                    <p>@Model.Description</p>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ComplianceNotes))
+            {
+                <div class="tax-note">
+                    <strong>Notes de conformité</strong>
+                    <p>@Model.ComplianceNotes</p>
+                </div>
+            }
+        </section>
+
+        <section class="panel tax-detail-card">
+            <div class="panel-title-row">
+                <div>
+                    <h2>Exigences et preuves</h2>
+                    <p class="panel-subtitle">Contrôles documentaires applicables au workflow.</p>
+                </div>
+            </div>
+            <div class="tax-check-grid">
+                <div class="tax-check @(Model.RequiresPayment ? "is-required" : "")">
+                    <span>Paiement</span><strong>@(Model.RequiresPayment ? "Requis" : "Non requis")</strong>
+                </div>
+                <div class="tax-check @(Model.RequiresSubmissionProof ? "is-required" : "")">
+                    <span>Preuve de soumission</span><strong>@(Model.RequiresSubmissionProof ? "Requise" : "Optionnelle")</strong>
+                </div>
+                <div class="tax-check @(Model.RequiresPaymentProof ? "is-required" : "")">
+                    <span>Preuve de paiement</span><strong>@(Model.RequiresPaymentProof ? "Requise" : "Optionnelle")</strong>
+                </div>
+            </div>
+            @if (Model.RequiredDocuments.Count > 0)
+            {
+                <ul class="tax-document-list">
+                    @foreach (var document in Model.RequiredDocuments)
+                    {
+                        <li>
+                            <span>@document.DocumentType</span>
+                            <span class="status-pill @(document.IsRequired ? "status-warning" : "status-inactive")">
+                                @(document.IsRequired ? "Obligatoire" : "Configurable")
+                            </span>
+                            <small>@document.Condition</small>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="tax-empty">Aucune règle documentaire spécifique n’est encore configurée.</p>
+            }
+        </section>
+    </div>
+
+    <section class="panel tax-detail-card" id="versions">
+        <div class="panel-title-row">
+            <div>
+                <h2>Responsabilités opérationnelles</h2>
+                <p class="panel-subtitle">Qui prépare, approuve, soumet, paie et assure le suivi.</p>
+            </div>
+            <span class="tax-count">@Model.Responsibles.Count acteur(s)</span>
+        </div>
+        @if (Model.Responsibles.Count > 0)
+        {
+            <div class="tax-people-grid">
+                @foreach (var responsible in Model.Responsibles)
+                {
+                    <article class="tax-person">
+                        <span class="tax-avatar">@responsible.UserDisplayName.Trim()[0].ToString().ToUpperInvariant()</span>
+                        <div>
+                            <strong>@responsible.UserDisplayName</strong>
+                            <span>@ResponsibleLabel(responsible.Type)</span>
+                            <small>@responsible.UserEmail</small>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="tax-empty">Aucun responsable n’est affecté à cette obligation.</p>
+        }
+    </section>
+
+    <div class="tax-detail-grid">
+        <section class="panel tax-detail-card">
+            <div class="panel-title-row">
+                <div>
+                    <h2>Calendrier et rappels</h2>
+                    <p class="panel-subtitle">Règles actuellement associées à l’obligation.</p>
+                </div>
+            </div>
+            @if (Model.ScheduleRules.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table tax-compact-table">
+                        <thead><tr><th>Période</th><th>Jour</th><th>Rappels</th><th>Report ouvré</th></tr></thead>
+                        <tbody>
+                        @foreach (var rule in Model.ScheduleRules)
+                        {
+                            <tr>
+                                <td>@MonthLabel(rule.DueMonth)</td>
+                                <td>@rule.DueDay</td>
+                                <td>@(rule.RawReminderText ?? rule.ReminderDays ?? "—")</td>
+                                <td>@(rule.MoveToNextBusinessDay ? "Oui" : "Non")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="tax-empty">Aucune règle de calendrier n’est configurée.</p>
+            }
+        </section>
+
+        <section class="panel tax-detail-card">
+            <div class="panel-title-row">
+                <div>
+                    <h2>Conflits de catalogue</h2>
+                    <p class="panel-subtitle">Écarts détectés entre les sources consolidées.</p>
+                </div>
+                @if (Model.Conflicts.Count > 0)
+                {
+                    <span class="status-pill status-warning">@Model.Conflicts.Count à traiter</span>
+                }
+            </div>
+            @if (Model.Conflicts.Count > 0)
+            {
+                <div class="tax-conflict-list">
+                    @foreach (var conflict in Model.Conflicts)
+                    {
+                        <article>
+                            <div><strong>@conflict.FieldName</strong><span class="status-pill status-warning">@conflict.Status</span></div>
+                            <p><span>Existant</span>@(conflict.ExistingValue ?? "—")</p>
+                            <p><span>Entrant</span>@(conflict.IncomingValue ?? "—")</p>
+                            <small>@conflict.SourceName · ligne @conflict.SourceRow</small>
+                        </article>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="tax-empty">Aucun conflit enregistré pour cette obligation.</p>
+            }
+        </section>
+    </div>
+
+    <section class="panel tax-detail-card">
+        <div class="panel-title-row">
+            <div>
+                <h2>Versions et fondements légaux</h2>
+                <p class="panel-subtitle">Historique des paramètres légaux sans altérer les anciennes déclarations.</p>
+            </div>
+            <span class="tax-count">@Model.Versions.Count version(s)</span>
+        </div>
+        @if (Model.Versions.Count > 0)
+        {
+            <div class="tax-version-list">
+                @foreach (var version in Model.Versions)
+                {
+                    <details open="@(version == currentVersion ? "open" : null)">
+                        <summary>
+                            <span>Version @version.VersionNumber</span>
+                            <small>
+                                @version.EffectiveFrom.ToString("dd/MM/yyyy")
+                                — @(version.EffectiveTo?.ToString("dd/MM/yyyy") ?? "en cours")
+                                · @version.ValidationStatus
+                            </small>
+                        </summary>
+                        <div class="tax-version-content">
+                            <dl class="tax-fact-list">
+                                <div><dt>Autorité</dt><dd>@(version.Authority ?? "Non renseignée")</dd></div>
+                                <div><dt>Fréquence</dt><dd>@(version.Frequency ?? "Non renseignée")</dd></div>
+                                <div><dt>Échéance de dépôt</dt><dd>@(version.FilingDeadlineRule ?? "Non renseignée")</dd></div>
+                                <div><dt>Échéance de paiement</dt><dd>@(version.PaymentDeadlineRule ?? "Non renseignée")</dd></div>
+                                <div><dt>Cycle métier</dt><dd>@(version.BusinessCycle ?? "Non renseigné")</dd></div>
+                                <div><dt>Motif</dt><dd>@version.ChangeReason</dd></div>
+                            </dl>
+                            @if (version.RateRules.Count > 0)
+                            {
+                                <div class="tax-legal-block"><strong>Taux et base taxable</strong>@foreach (var item in version.RateRules) { <p>@item</p> }</div>
+                            }
+                            @if (version.LegalReferences.Count > 0)
+                            {
+                                <div class="tax-legal-block"><strong>Références légales</strong>@foreach (var item in version.LegalReferences) { <p>@item</p> }</div>
+                            }
+                            @if (version.PenaltyRules.Count > 0)
+                            {
+                                <div class="tax-legal-block"><strong>Pénalités et commentaires</strong>@foreach (var item in version.PenaltyRules) { <p>@item</p> }</div>
+                            }
+                            @if (version.ProcessTemplates.Count > 0)
+                            {
+                                <div class="tax-legal-block"><strong>Processus attendu</strong>@foreach (var item in version.ProcessTemplates) { <p>@item</p> }</div>
+                            }
+                        </div>
+                    </details>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="tax-empty">Cette obligation n’a pas encore de version fiscale consolidée.</p>
+        }
+    </section>
+
+    @if (Model.Allocations.Count > 0)
+    {
+        <section class="panel tax-detail-card">
+            <div class="panel-title-row"><div><h2>Répartition de la recette</h2><p class="panel-subtitle">Allocations informatives, non traitées comme obligations distinctes.</p></div></div>
+            <div class="tax-allocation-grid">
+                @foreach (var allocation in Model.Allocations)
+                {
+                    <article><strong>@allocation.Percentage.ToString("0.##") %</strong><span>@allocation.Beneficiary</span><small>@allocation.SourceName · ligne @allocation.SourceRow</small></article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="panel tax-detail-card">
+        <div class="panel-title-row">
+            <div>
+                <h2>Traçabilité des sources</h2>
+                <p class="panel-subtitle">Alias et lignes ayant servi au rapprochement.</p>
+            </div>
+        </div>
+        @if (Model.Aliases.Count > 0 || Model.SourceReferences.Count > 0)
+        {
+            <div class="tax-source-grid">
+                <div>
+                    <h3>Alias</h3>
+                    @foreach (var alias in Model.Aliases)
+                    {
+                        <div class="tax-source-row"><strong>@alias.Alias</strong><small>@alias.SourceName · ligne @alias.SourceRow</small></div>
+                    }
+                </div>
+                <div>
+                    <h3>Références importées</h3>
+                    @foreach (var source in Model.SourceReferences)
+                    {
+                        <div class="tax-source-row">
+                            <strong>@source.SourceName</strong>
+                            <small>Ligne @source.SourceRow @(source.ExternalNumber is null ? "" : $"· n° {source.ExternalNumber}")</small>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="tax-empty">Aucune référence consolidée n’est encore enregistrée.</p>
+        }
+    </section>
+
+    @if (Model.IsActive)
+    {
+        <section class="panel tax-danger-zone">
+            <div>
+                <h2>Désactiver l’obligation</h2>
+                <p>Elle ne sera plus éligible à la génération de nouvelles déclarations. L’historique reste conservé.</p>
+            </div>
+            <form asp-action="Deactivate" method="post">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button class="btn btn-outline-danger" type="submit">Désactiver</button>
+            </form>
+        </section>
+    }
+</section>

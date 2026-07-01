@@ -1,0 +1,148 @@
+@model TaxObligationVersionFormViewModel
+
+@{
+    ViewData["Title"] = $"Nouvelle version fiscale — {Model.TaxObligationName}";
+}
+
+<section class="page-shell tax-version-form-page">
+    <div class="page-heading">
+        <div>
+            <span class="eyebrow">Réforme fiscale</span>
+            <h1>Créer la version @Model.VersionNumber</h1>
+            <p>
+                @Model.TaxObligationName — l’ancienne version sera clôturée la veille de la
+                nouvelle date d’effet et restera disponible dans l’historique.
+            </p>
+        </div>
+        <a class="btn btn-outline-secondary"
+           asp-action="Details"
+           asp-route-id="@Model.TaxObligationId">Annuler</a>
+    </div>
+
+    <div class="tax-review-banner" role="note">
+        <strong>Modification de fond</strong>
+        <span>
+            Vérifiez particulièrement la date d’effet, les taux, les échéances et les références légales.
+            Une nouvelle version ne modifie pas rétroactivement les anciennes déclarations.
+        </span>
+    </div>
+
+    <form method="post"
+          asp-action="CreateVersion"
+          asp-route-id="@Model.TaxObligationId"
+          class="panel form-grid tax-version-form">
+        <div asp-validation-summary="ModelOnly" class="text-danger form-wide"></div>
+
+        <h2 class="form-wide form-section-title">Entrée en vigueur</h2>
+
+        <div>
+            <label asp-for="EffectiveFrom" class="form-label">Date d’effet</label>
+            <input asp-for="EffectiveFrom"
+                   class="form-control"
+                   min="@Model.MinimumEffectiveFrom.ToString("yyyy-MM-dd")" />
+            <span asp-validation-for="EffectiveFrom" class="text-danger"></span>
+            <small class="form-text">Au plus tôt le @Model.MinimumEffectiveFrom.ToString("dd/MM/yyyy").</small>
+        </div>
+
+        <div>
+            <label asp-for="TaxAuthorityId" class="form-label">Autorité fiscale</label>
+            <select asp-for="TaxAuthorityId" asp-items="Model.Authorities" class="form-select">
+                <option value="">Non renseignée</option>
+            </select>
+            <span asp-validation-for="TaxAuthorityId" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="ValidationStatus" class="form-label">Statut de validation</label>
+            <select asp-for="ValidationStatus" asp-items="Model.ValidationStatuses" class="form-select"></select>
+            <span asp-validation-for="ValidationStatus" class="text-danger"></span>
+        </div>
+
+        <div class="critical-field">
+            <div>
+                <label asp-for="RequiresReview" class="critical-field-label">Revue fiscale requise</label>
+                <p class="critical-field-copy">Signale que cette version doit encore être confirmée par la fiscalité.</p>
+            </div>
+            <div class="form-check form-switch critical-field-control">
+                <input asp-for="RequiresReview" class="form-check-input" />
+            </div>
+        </div>
+
+        <div class="form-wide">
+            <label asp-for="ChangeReason" class="form-label">Motif et portée de la réforme</label>
+            <textarea asp-for="ChangeReason" class="form-control" rows="3"
+                      placeholder="Ex. Loi de finances 2027 : nouveau taux et nouvelle échéance de dépôt."></textarea>
+            <span asp-validation-for="ChangeReason" class="text-danger"></span>
+        </div>
+
+        <h2 class="form-wide form-section-title">Périodicité et échéances</h2>
+
+        <div>
+            <label asp-for="Frequency" class="form-label">Fréquence légale</label>
+            <input asp-for="Frequency" class="form-control" />
+            <span asp-validation-for="Frequency" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="BusinessCycle" class="form-label">Cycle métier</label>
+            <input asp-for="BusinessCycle" class="form-control" />
+            <span asp-validation-for="BusinessCycle" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="FilingDeadlineRule" class="form-label">Règle d’échéance de déclaration</label>
+            <textarea asp-for="FilingDeadlineRule" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="FilingDeadlineRule" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="PaymentDeadlineRule" class="form-label">Règle d’échéance de paiement</label>
+            <textarea asp-for="PaymentDeadlineRule" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="PaymentDeadlineRule" class="text-danger"></span>
+        </div>
+
+        <div class="form-wide">
+            <label asp-for="RawDeadlineText" class="form-label">Texte officiel de l’échéance</label>
+            <textarea asp-for="RawDeadlineText" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="RawDeadlineText" class="text-danger"></span>
+        </div>
+
+        <h2 class="form-wide form-section-title">Règles et fondements</h2>
+        <p class="form-wide tax-version-hint">Saisissez une règle par ligne. Les lignes vides sont ignorées.</p>
+
+        <div>
+            <label asp-for="RateRules" class="form-label">Taux et bases taxables</label>
+            <textarea asp-for="RateRules" class="form-control tax-version-rules" rows="7"></textarea>
+            <span asp-validation-for="RateRules" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="LegalReferences" class="form-label">Références légales</label>
+            <textarea asp-for="LegalReferences" class="form-control tax-version-rules" rows="7"></textarea>
+            <span asp-validation-for="LegalReferences" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="PenaltyRules" class="form-label">Pénalités et conséquences</label>
+            <textarea asp-for="PenaltyRules" class="form-control tax-version-rules" rows="7"></textarea>
+            <span asp-validation-for="PenaltyRules" class="text-danger"></span>
+        </div>
+
+        <div>
+            <label asp-for="ProcessTemplates" class="form-label">Processus opérationnel</label>
+            <textarea asp-for="ProcessTemplates" class="form-control tax-version-rules" rows="7"></textarea>
+            <span asp-validation-for="ProcessTemplates" class="text-danger"></span>
+        </div>
+
+        <div class="form-wide form-actions">
+            <button class="btn btn-primary" type="submit">Enregistrer la nouvelle version</button>
+            <a class="btn btn-outline-secondary"
+               asp-action="Details"
+               asp-route-id="@Model.TaxObligationId">Annuler</a>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

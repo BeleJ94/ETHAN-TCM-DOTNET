@@ -1,0 +1,817 @@
+@using EthanTcm.Application.Authentication
+@using EthanTcm.Domain.Enums
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@model TaxDeclarationWorkflowDetailsViewModel
+
+@{
+    ViewData["Title"] = "Tax Declaration";
+    var declaration = Model.Declaration;
+    var canPrepare = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.PrepareTaxDeclarations)).Succeeded;
+    var canApprove = declaration.ApprovalSteps.Any(step => step.CanAct) ||
+        (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ApproveTaxDeclarations)).Succeeded;
+    var canManagePayments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ManageTaxPayments)).Succeeded;
+    var canUploadDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.UploadTaxDocuments)).Succeeded;
+    var canDownloadDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.DownloadTaxDocuments)).Succeeded;
+    var canDeleteDocuments = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.DeleteTaxDocuments)).Succeeded;
+    var canManageLifecycle = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ManageTaxDeclarationLifecycle)).Succeeded;
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var daysToDue = declaration.DueDate.DayNumber - today.DayNumber;
+    var isTerminal = declaration.Status is TaxDeclarationStatus.Closed or TaxDeclarationStatus.Cancelled or TaxDeclarationStatus.NotApplicable;
+    var isLate = !isTerminal && declaration.DueDate < today;
+    var isDueSoon = !isTerminal && daysToDue >= 0 && daysToDue <= 5;
+    var hasSubmissionProof = declaration.Documents.Any(document => document.DocumentType == DocumentType.SubmissionProof);
+    var hasPaymentProof = declaration.Documents.Any(document => document.DocumentType == DocumentType.PaymentProof);
+    var hasPreparationProof = declaration.Documents.Any(document => document.DocumentType == DocumentType.TaxReturnDraft);
+    var preparationProof = declaration.Documents
+        .Where(document => document.DocumentType == DocumentType.TaxReturnDraft)
+        .OrderByDescending(document => document.UploadedAt)
+        .ThenByDescending(document => document.Version)
+        .FirstOrDefault();
+    var submissionProof = declaration.Documents
+        .Where(document => document.DocumentType == DocumentType.SubmissionProof)
+        .OrderByDescending(document => document.UploadedAt)
+        .ThenByDescending(document => document.Version)
+        .FirstOrDefault();
+    var paymentProof = declaration.Documents
+        .Where(document => document.DocumentType == DocumentType.PaymentProof)
+        .OrderByDescending(document => document.UploadedAt)
+        .ThenByDescending(document => document.Version)
+        .FirstOrDefault();
+    var latestPayment = declaration.Payments
+        .OrderByDescending(payment => payment.PaidAt)
+        .FirstOrDefault();
+    var hasPaymentRecord = declaration.Payments.Any();
+    var canClose = hasSubmissionProof && (!declaration.PaymentRequired || (hasPaymentProof && hasPaymentRecord));
+    var stageIndex = GetStageIndex(declaration.Status, declaration.PaymentRequired);
+    var isPrepared = declaration.Status is not TaxDeclarationStatus.ToPrepare and not TaxDeclarationStatus.InPreparation;
+    var isApprovalComplete = declaration.Status is TaxDeclarationStatus.ReadyForSubmission
+        or TaxDeclarationStatus.Submitted
+        or TaxDeclarationStatus.PaymentPending
+        or TaxDeclarationStatus.Paid
+        or TaxDeclarationStatus.Closed;
+    var isSubmitted = declaration.Status is TaxDeclarationStatus.Submitted
+        or TaxDeclarationStatus.PaymentPending
+        or TaxDeclarationStatus.Paid
+        or TaxDeclarationStatus.Closed;
+    var isPaymentCleared = !declaration.PaymentRequired || declaration.Status is TaxDeclarationStatus.Paid or TaxDeclarationStatus.Closed;
+    var isClosureComplete = declaration.Status == TaxDeclarationStatus.Closed;
+    var complianceItems = new[]
+    {
+        BuildChecklistItem("Prepared and sent to review", isPrepared, stageIndex == 0, declaration.Status == TaxDeclarationStatus.Rejected, "Waiting for preparation"),
+        BuildChecklistItem("Preparation proof attached", hasPreparationProof, stageIndex == 0, isPrepared && !hasPreparationProof, "Required before review"),
+        BuildChecklistItem("Approval cycle completed", isApprovalComplete, stageIndex == 1, false, "Waiting for approval"),
+        BuildChecklistItem("Submission proof attached", hasSubmissionProof, stageIndex == 2 && isApprovalComplete, isSubmitted && !hasSubmissionProof, "Required before submission"),
+        BuildChecklistItem("Submitted to authority", isSubmitted, stageIndex == 2 && hasSubmissionProof, false, "Waiting for submission"),
+        BuildChecklistItem(declaration.PaymentRequired ? "Payment recorded" : "Payment not required", isPaymentCleared, stageIndex == 3 && declaration.PaymentRequired, declaration.PaymentRequired && declaration.Status == TaxDeclarationStatus.PaymentPending && !hasPaymentRecord, declaration.PaymentRequired ? "Waiting for payment" : "Skipped"),
+        BuildChecklistItem(declaration.PaymentRequired ? "Payment proof attached" : "Payment proof not required", !declaration.PaymentRequired || hasPaymentProof, stageIndex == 3 && declaration.PaymentRequired, declaration.PaymentRequired && declaration.Status == TaxDeclarationStatus.PaymentPending && !hasPaymentProof, declaration.PaymentRequired ? "Required before paid status" : "Skipped"),
+        BuildChecklistItem("Declaration closed", isClosureComplete, canClose && !isClosureComplete, false, canClose ? "Ready to close" : "Waiting for blockers")
+    };
+    var nextAction = GetNextAction(declaration.Status, declaration.PaymentRequired, hasSubmissionProof, hasPaymentProof, hasPaymentRecord);
+    var nextActionClass = isLate ? "status-danger" : isDueSoon ? "status-warning" : "status-active";
+    var journeySteps = new[]
+    {
+        new WorkflowStep("Preparation", "Preparer", "Complete the tax return working file."),
+        new WorkflowStep("Review", "Approvers", "Validate the declaration through the approval levels."),
+        new WorkflowStep("Submission", "Submission owner", "Submit to the tax authority and attach proof."),
+        new WorkflowStep("Payment", "Finance", declaration.PaymentRequired ? "Pay the due amount and attach payment proof." : "No payment follow-up required."),
+        new WorkflowStep("Closure", "Tax manager", "Confirm evidence and close the compliance cycle.")
+    };
+    var currentStep = journeySteps[Math.Clamp(stageIndex, 0, journeySteps.Length - 1)];
+    var currentOwner = stageIndex switch
+    {
+        0 => declaration.AssignedTo,
+        1 => nextAction.Owner,
+        2 => declaration.ExpectedSubmissionOwner,
+        3 => declaration.ExpectedPaymentOwner,
+        4 => declaration.ExpectedClosureOwner,
+        _ => nextAction.Owner
+    };
+    var proofSummary = $"{(hasPreparationProof ? "Preparation" : "Prep missing")} / {(hasSubmissionProof ? "Submission" : "Sub missing")} / {(!declaration.PaymentRequired ? "No payment" : hasPaymentProof ? "Payment" : "Pay missing")}";
+}
+
+<section class="page-shell declaration-details">
+    <div class="page-heading declaration-heading">
+        <div>
+            <div class="heading-kicker">Tax declaration dossier</div>
+            <h1>@declaration.ObligationName</h1>
+            <p>@declaration.PeriodLabel</p>
+        </div>
+        <div class="page-actions">
+            @if (isLate)
+            {
+                <span class="status-pill status-danger status-critical">Late by @Math.Abs(daysToDue) day@(Math.Abs(daysToDue) == 1 ? string.Empty : "s")</span>
+            }
+            else if (isDueSoon)
+            {
+                <span class="status-pill status-warning status-critical">Due in @daysToDue day@(daysToDue == 1 ? string.Empty : "s")</span>
+            }
+            <span class="status-pill @GetStatusClass(declaration.Status, isLate)">@GetStatusLabel(declaration.Status)</span>
+            <a class="btn btn-outline-secondary" asp-action="Index"><svg class="icon"><use href="#icon-open"></use></svg>Back</a>
+        </div>
+    </div>
+
+    @if (TempData["StatusMessage"] is string message)
+    {
+        <div class="alert @(IsSuccessMessage(message) ? "alert-success" : "alert-warning")">@message</div>
+    }
+
+    <section class="panel operational-hero action-focus-panel">
+        <div class="action-focus-main">
+            <span class="panel-subtitle">Action required</span>
+            <h2>@nextAction.Label</h2>
+            <p>@nextAction.Message</p>
+        </div>
+        <dl class="action-focus-meta">
+            <div>
+                <dt>Current step</dt>
+                <dd>@currentStep.Name</dd>
+            </div>
+            <div>
+                <dt>Owner</dt>
+                <dd>@currentOwner</dd>
+            </div>
+            <div>
+                <dt>Payment</dt>
+                <dd>@(declaration.PaymentRequired ? "Tracking required" : "Not required")</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="panel workflow-stepper-panel">
+        <div class="panel-title-row">
+            <h2>Workflow</h2>
+            <span class="panel-subtitle">Preparation to closure</span>
+        </div>
+        <ol class="workflow-stepper">
+            @for (var index = 0; index < journeySteps.Length; index++)
+            {
+                var step = journeySteps[index];
+                var state = GetStepState(index, stageIndex, declaration.PaymentRequired, declaration.Status);
+                <li class="workflow-step workflow-step-@state">
+                    <div class="workflow-step-marker">@(index + 1)</div>
+                    <div>
+                        <strong>@step.Name</strong>
+                        <span>@step.Owner</span>
+                        <p>@step.Description</p>
+                    </div>
+                </li>
+            }
+        </ol>
+    </section>
+
+    <section class="panel">
+            <div class="metric-grid key-facts-grid">
+            <div class="metric @(isLate ? "metric-danger metric-blink" : isDueSoon ? "metric-warning metric-blink" : string.Empty)">
+                <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
+                <span>Due date</span>
+                <strong>@declaration.DueDate.ToString("yyyy-MM-dd")</strong>
+            </div>
+            <div class="metric">
+                <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-user"></use></svg></span>
+                <span>Assigned</span>
+                <strong>@declaration.AssignedTo</strong>
+            </div>
+            <div class="metric @(hasPreparationProof ? "metric-success" : "metric-warning")">
+                <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-check"></use></svg></span>
+                <span>Prepared by</span>
+                <strong>@declaration.PreparedBy</strong>
+            </div>
+            <div class="metric @(declaration.PaymentRequired ? "metric-warning" : string.Empty)">
+                <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
+                <span>Payment</span>
+                <strong>@(declaration.PaymentRequired ? "Required" : "Not required")</strong>
+            </div>
+            <div class="metric @((hasPreparationProof && hasSubmissionProof && (!declaration.PaymentRequired || hasPaymentProof)) ? "metric-success" : "metric-warning")">
+                <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-paperclip"></use></svg></span>
+                <span>Proofs</span>
+                <strong>@proofSummary</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="declaration-workspace">
+        <div class="workspace-main">
+            <section class="panel">
+                <div class="panel-title-row">
+                    <h2>Available actions</h2>
+                    <span class="panel-subtitle">Actions are shown only when allowed for your role and workflow step</span>
+                </div>
+
+                <div class="stage-action-grid">
+                    <div class="stage-action-card @(stageIndex == 0 ? "stage-action-active" : string.Empty)">
+                        <div>
+                            <span class="stage-kicker">Preparation</span>
+                            <h3>Prepare and submit for review</h3>
+                            <p>Start the file, complete the working data and send it to approvers.</p>
+                            <dl class="stage-meta-list">
+                                <dt>Assigned preparer</dt>
+                                <dd>@declaration.AssignedTo</dd>
+                                <dt>Actual preparer</dt>
+                                <dd>@declaration.PreparedBy</dd>
+                                <dt>Prepared at</dt>
+                                <dd>@(declaration.PreparedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                <dt>Preparation proof</dt>
+                                <dd>@(preparationProof?.FileName ?? "-")</dd>
+                            </dl>
+                        </div>
+                        <div class="form-actions">
+                            @if (canPrepare && declaration.Status == TaxDeclarationStatus.ToPrepare)
+                            {
+                                <form method="post" asp-action="StartPreparation" class="js-confirm-ajax-form" data-confirm-title="Start preparation">
+                                    <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                    <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-edit"></use></svg>Start preparation</button>
+                                </form>
+                            }
+                            @if (canPrepare && declaration.Status is (TaxDeclarationStatus.InPreparation or TaxDeclarationStatus.Rejected))
+                            {
+                                <form method="post" asp-action="SubmitForReview" enctype="multipart/form-data" class="js-confirm-ajax-form" data-confirm-title="Submit for review">
+                                    <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                    <div>
+                                        <label class="form-label" for="PreparationProofUpload">Preparation proof</label>
+                                        <input id="PreparationProofUpload" class="form-control" name="Upload" type="file" required />
+                                    </div>
+                                    <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Submit for review</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="stage-action-card approval-chain-card @(stageIndex == 1 ? "stage-action-active" : string.Empty)">
+                        <div>
+                            <span class="stage-kicker">Review</span>
+                            <h3>Approval chain</h3>
+                            <p>Each level is handled separately by its configured approver. Rejection requires a clear correction comment.</p>
+                        </div>
+                        <div class="approval-level-grid">
+                            @foreach (var step in declaration.ApprovalSteps)
+                            {
+                                <article class="approval-level-card @GetApprovalStepClass(step.Status)">
+                                    <div class="approval-level-header">
+                                        <span class="approval-level-marker">@step.Level</span>
+                                        <div>
+                                            <h4>@step.Title</h4>
+                                            <span>@GetResponsibleTypeLabel(step.ResponsibleType)</span>
+                                        </div>
+                                        <span class="status-pill @GetApprovalStepStatusClass(step.Status)">@GetApprovalStepStatusLabel(step.Status)</span>
+                                    </div>
+                                    <dl class="stage-meta-list">
+                                        <dt>Expected approver</dt>
+                                        <dd>@step.ExpectedApprovers</dd>
+                                        <dt>Decision by</dt>
+                                        <dd>@step.DecidedBy</dd>
+                                        <dt>Decision at</dt>
+                                        <dd>@(step.DecidedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                        <dt>Comment</dt>
+                                        <dd>@(string.IsNullOrWhiteSpace(step.Comment) ? "-" : step.Comment)</dd>
+                                    </dl>
+                                    @if (canApprove && step.CanAct)
+                                    {
+                                        <div class="approval-actions approval-level-actions">
+                                            <form method="post" asp-action="Approve" class="js-confirm-ajax-form" data-confirm-title="Approve level @step.Level">
+                                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                                <button class="btn btn-outline-success" type="submit"><svg class="icon"><use href="#icon-check"></use></svg>Approve level @step.Level</button>
+                                            </form>
+                                            <form method="post" asp-action="Reject" class="inline-action-form js-confirm-ajax-form" data-confirm-title="Reject level @step.Level">
+                                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                                <input class="form-control" name="Comment" placeholder="Mandatory rejection comment" />
+                                                <button class="btn btn-outline-danger" type="submit"><svg class="icon"><use href="#icon-x"></use></svg>Reject level @step.Level</button>
+                                            </form>
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="stage-action-card @(stageIndex == 2 ? "stage-action-active" : string.Empty)">
+                        <div>
+                            <span class="stage-kicker">Submission</span>
+                            <h3>Submit to the authority</h3>
+                            <p>Attach the submission proof before marking the declaration as submitted.</p>
+                            <dl class="stage-meta-list responsibility-meta-list">
+                                <dt>Expected</dt>
+                                <dd>@declaration.ExpectedSubmissionOwner</dd>
+                                <dt>Actual</dt>
+                                <dd>@declaration.SubmittedBy</dd>
+                                <dt>Date</dt>
+                                <dd>@(declaration.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                <dt>Evidence</dt>
+                                <dd>@(submissionProof?.FileName ?? "-")</dd>
+                            </dl>
+                        </div>
+                        @if (canPrepare && declaration.Status is (TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission))
+                        {
+                            <form method="post" asp-action="MarkSubmitted" class="inline-action-form js-confirm-ajax-form" data-confirm-title="Mark submitted">
+                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                <input class="form-control" asp-for="Action.SubmissionReference" name="SubmissionReference" placeholder="Submission reference" />
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-upload"></use></svg>Mark submitted</button>
+                            </form>
+                        }
+                    </div>
+
+                    <div class="stage-action-card @(stageIndex == 3 ? "stage-action-active" : string.Empty)">
+                        <div>
+                            <span class="stage-kicker">Payment</span>
+                            <h3>Confirm fiscal payment</h3>
+                            <p>Payment proof is mandatory before moving the declaration to paid.</p>
+                            <dl class="stage-meta-list responsibility-meta-list">
+                                <dt>Expected</dt>
+                                <dd>@declaration.ExpectedPaymentOwner</dd>
+                                <dt>Actual</dt>
+                                <dd>@(latestPayment?.PaidBy ?? "-")</dd>
+                                <dt>Date</dt>
+                                <dd>@(latestPayment?.PaidAt.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                <dt>Evidence</dt>
+                                <dd>@(paymentProof?.FileName ?? "-")</dd>
+                            </dl>
+                        </div>
+                        @if (canManagePayments && declaration.PaymentRequired && declaration.Status == TaxDeclarationStatus.PaymentPending)
+                        {
+                            <form method="post" asp-action="MarkPaid" class="payment-action-form js-confirm-ajax-form" data-confirm-title="Mark paid">
+                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                <input class="form-control" asp-for="Action.Amount" name="Amount" type="number" min="0.01" step="0.01" placeholder="Amount" />
+                                <input class="form-control" asp-for="Action.Currency" name="Currency" placeholder="Currency" />
+                                <input class="form-control" asp-for="Action.PaymentReference" name="PaymentReference" placeholder="Payment reference" />
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-credit-card"></use></svg>Mark paid</button>
+                            </form>
+                        }
+                    </div>
+
+                    <div class="stage-action-card @(stageIndex == 4 ? "stage-action-active" : string.Empty)">
+                        <div>
+                            <span class="stage-kicker">Closure</span>
+                            <h3>Close compliance cycle</h3>
+                            <p>Confirm evidence, payment status and final closure of the declaration.</p>
+                            <dl class="stage-meta-list responsibility-meta-list">
+                                <dt>Expected</dt>
+                                <dd>@declaration.ExpectedClosureOwner</dd>
+                                <dt>Actual</dt>
+                                <dd>@declaration.ClosedBy</dd>
+                                <dt>Date</dt>
+                                <dd>@(declaration.ClosedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
+                                <dt>Evidence</dt>
+                                <dd><span class="status-pill @(canClose ? "status-active" : "status-warning")">@(canClose ? "Ready" : "Blocked")</span></dd>
+                            </dl>
+                        </div>
+                        @if (canManageLifecycle && declaration.Status is (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid))
+                        {
+                            <form method="post" asp-action="Close" class="js-confirm-ajax-form" data-confirm-title="Close declaration">
+                                <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                                <button class="btn btn-primary" type="submit"><svg class="icon"><use href="#icon-check"></use></svg>Close</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title-row">
+                    <h2>Documents</h2>
+                    <span class="panel-subtitle">Evidence required by the current workflow</span>
+                </div>
+                @if (canUploadDocuments)
+                {
+                    <form method="post" asp-action="AttachDocument" enctype="multipart/form-data" class="form-grid document-upload-form js-confirm-ajax-form" data-confirm-title="Attach document">
+                        <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                        <div>
+                            <label class="form-label" asp-for="Action.DocumentType">Type</label>
+                            <select class="form-select" asp-for="Action.DocumentType" name="DocumentType" asp-items="Html.GetEnumSelectList<DocumentType>()"></select>
+                        </div>
+                        <div>
+                            <label class="form-label" asp-for="Action.Upload">File</label>
+                            <input class="form-control" asp-for="Action.Upload" name="Upload" type="file" />
+                        </div>
+                        <div>
+                            <label class="form-label" asp-for="Action.ContentType">Content type</label>
+                            <input class="form-control" asp-for="Action.ContentType" name="ContentType" />
+                        </div>
+                        <div class="form-wide form-actions">
+                            <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-paperclip"></use></svg>Attach document</button>
+                        </div>
+                    </form>
+                }
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle js-data-table" data-page-size="10">
+                        <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>File</th>
+                            <th>Version</th>
+                            <th>Size</th>
+                            <th>Uploaded</th>
+                            <th>Uploaded by</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var document in declaration.Documents)
+                        {
+                            <tr>
+                                <td>@GetDocumentTypeLabel(document.DocumentType)</td>
+                                <td>@document.FileName</td>
+                                <td>v@document.Version</td>
+                                <td>@FormatFileSize(document.FileSizeBytes)</td>
+                                <td>@document.UploadedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@document.UploadedBy</td>
+                                <td class="text-end">
+                                    @if (canDownloadDocuments)
+                                    {
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="DownloadDocument" asp-route-id="@document.Id"><svg class="icon"><use href="#icon-download"></use></svg>Download</a>
+                                    }
+                                    @if (canDeleteDocuments)
+                                    {
+                                        <form method="post" asp-action="DeleteDocument" class="d-inline js-confirm-ajax-form" data-confirm-title="Delete document">
+                                            <input type="hidden" name="id" value="@document.Id" />
+                                            <input type="hidden" name="taxDeclarationId" value="@declaration.Id" />
+                                            <button class="btn btn-sm btn-outline-danger" type="submit"><svg class="icon"><use href="#icon-trash"></use></svg>Delete</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-title-row">
+                    <h2>History</h2>
+                    <span class="panel-subtitle">Approval decisions recorded on this declaration</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle js-data-table" data-page-size="10">
+                        <thead>
+                        <tr>
+                            <th>Cycle</th>
+                            <th>Level</th>
+                            <th>Decision</th>
+                            <th>Comment</th>
+                            <th>Date</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var approval in declaration.Approvals)
+                        {
+                            <tr>
+                                <td>@approval.CycleNumber</td>
+                                <td>@approval.Level</td>
+                                <td>@approval.Decision</td>
+                                <td>@approval.Comment</td>
+                                <td>@approval.DecidedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <aside class="workspace-side">
+            <section class="panel compliance-panel">
+                <details>
+                    <summary>
+                        <span>
+                            <strong>Compliance checklist</strong>
+                            <small>@GetComplianceSubtitle(declaration.Status)</small>
+                        </span>
+                    </summary>
+                    <ul class="checklist">
+                        @foreach (var item in complianceItems)
+                        {
+                            <li class="@GetChecklistClass(item)">
+                                <svg class="icon"><use href="@GetChecklistIcon(item)"></use></svg>
+                                <span>
+                                    <strong>@item.Label</strong>
+                                    <small>@GetChecklistStateLabel(item)</small>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                </details>
+            </section>
+
+            <section class="panel">
+                <h2>Operational owners</h2>
+                <dl class="detail-list operational-detail-list">
+                    <dt>Preparer expected</dt>
+                    <dd>@declaration.AssignedTo</dd>
+                    <dt>Preparer actual</dt>
+                    <dd>@declaration.PreparedBy</dd>
+                    <dt>Submission expected</dt>
+                    <dd>@declaration.ExpectedSubmissionOwner</dd>
+                    <dt>Submission actual</dt>
+                    <dd>@declaration.SubmittedBy</dd>
+                    <dt>Payment expected</dt>
+                    <dd>@declaration.ExpectedPaymentOwner</dd>
+                    <dt>Payment actual</dt>
+                    <dd>@(latestPayment?.PaidBy ?? "-")</dd>
+                    <dt>Closure expected</dt>
+                    <dd>@declaration.ExpectedClosureOwner</dd>
+                    <dt>Closure actual</dt>
+                    <dd>@declaration.ClosedBy</dd>
+                    <dt>Reference</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(declaration.SubmissionReference) ? "-" : declaration.SubmissionReference)</dd>
+                    <dt>Close ready</dt>
+                    <dd><span class="status-pill @(canClose ? "status-active" : "status-warning")">@(canClose ? "Ready" : "Blocked")</span></dd>
+                </dl>
+            </section>
+
+            @if (canManageLifecycle && !isTerminal)
+            {
+                <section class="panel">
+                    <div class="panel-title-row">
+                        <h2>Reassign declaration</h2>
+                        <span class="panel-subtitle">Tax manager control</span>
+                    </div>
+                    <form method="post" asp-action="Reassign" class="reassign-form js-confirm-ajax-form" data-confirm-title="Reassign declaration">
+                        <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                        <div>
+                            <label class="form-label" asp-for="Action.AssignedToUserId">New assignee</label>
+                            <select class="form-select" asp-for="Action.AssignedToUserId" name="AssignedToUserId" asp-items="Model.Users"></select>
+                        </div>
+                        <div>
+                            <label class="form-label" asp-for="Action.ReassignmentComment">Reason</label>
+                            <textarea class="form-control" asp-for="Action.ReassignmentComment" name="ReassignmentComment" rows="3" placeholder="Mandatory reassignment reason"></textarea>
+                        </div>
+                        <button class="btn btn-outline-primary" type="submit"><svg class="icon"><use href="#icon-user"></use></svg>Reassign</button>
+                    </form>
+                </section>
+            }
+
+            @if (canManageLifecycle)
+            {
+                <section class="panel">
+                    <h2>Lifecycle controls</h2>
+                    <div class="form-actions lifecycle-actions">
+                        <form method="post" asp-action="Cancel" class="js-confirm-ajax-form" data-confirm-title="Cancel declaration">
+                            <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                            <button class="btn btn-outline-danger" type="submit"><svg class="icon"><use href="#icon-x"></use></svg>Cancel</button>
+                        </form>
+                    </div>
+                </section>
+            }
+        </aside>
+    </section>
+</section>
+
+@functions {
+    private sealed record WorkflowStep(string Name, string Owner, string Description);
+
+    private sealed record NextAction(string Label, string Owner, string Message);
+
+    private sealed record ChecklistItem(string Label, bool Done, bool Current, bool Blocked, string PendingLabel);
+
+    private static ChecklistItem BuildChecklistItem(string label, bool done, bool current, bool blocked, string pendingLabel)
+    {
+        return new ChecklistItem(label, done, current && !done && !blocked, blocked, pendingLabel);
+    }
+
+    private static string GetChecklistClass(ChecklistItem item)
+    {
+        if (item.Done)
+        {
+            return "checklist-done";
+        }
+
+        if (item.Blocked)
+        {
+            return "checklist-missing";
+        }
+
+        if (item.Current)
+        {
+            return "checklist-current";
+        }
+
+        return "checklist-pending";
+    }
+
+    private static string GetChecklistIcon(ChecklistItem item)
+    {
+        if (item.Done)
+        {
+            return "#icon-check";
+        }
+
+        return item.Blocked || item.Current ? "#icon-alert" : "#icon-clock";
+    }
+
+    private static string GetChecklistStateLabel(ChecklistItem item)
+    {
+        if (item.Done)
+        {
+            return "Done";
+        }
+
+        if (item.Blocked)
+        {
+            return "Blocking";
+        }
+
+        if (item.Current)
+        {
+            return item.PendingLabel;
+        }
+
+        return item.PendingLabel;
+    }
+
+    private static string GetApprovalStepClass(TaxDeclarationApprovalStepStatus status)
+    {
+        return status switch
+        {
+            TaxDeclarationApprovalStepStatus.Approved => "approval-level-approved",
+            TaxDeclarationApprovalStepStatus.Pending => "approval-level-pending",
+            TaxDeclarationApprovalStepStatus.Rejected => "approval-level-rejected",
+            _ => "approval-level-not-reached"
+        };
+    }
+
+    private static string GetApprovalStepStatusClass(TaxDeclarationApprovalStepStatus status)
+    {
+        return status switch
+        {
+            TaxDeclarationApprovalStepStatus.Approved => "status-active",
+            TaxDeclarationApprovalStepStatus.Pending => "status-warning",
+            TaxDeclarationApprovalStepStatus.Rejected => "status-danger",
+            _ => "status-inactive"
+        };
+    }
+
+    private static string GetApprovalStepStatusLabel(TaxDeclarationApprovalStepStatus status)
+    {
+        return status switch
+        {
+            TaxDeclarationApprovalStepStatus.Approved => "Approved",
+            TaxDeclarationApprovalStepStatus.Pending => "Pending",
+            TaxDeclarationApprovalStepStatus.Rejected => "Rejected",
+            _ => "Not reached"
+        };
+    }
+
+    private static string GetResponsibleTypeLabel(ResponsibleType type)
+    {
+        return type switch
+        {
+            ResponsibleType.Approver1 => "Approver level 1",
+            ResponsibleType.Approver2 => "Approver level 2",
+            ResponsibleType.Approver3 => "Approver level 3",
+            ResponsibleType.Approver => "Generic approver",
+            _ => type.ToString()
+        };
+    }
+
+    private static string GetComplianceSubtitle(TaxDeclarationStatus status)
+    {
+        return status switch
+        {
+            TaxDeclarationStatus.Closed => "Completed",
+            TaxDeclarationStatus.Cancelled => "Cancelled",
+            TaxDeclarationStatus.NotApplicable => "Not applicable",
+            TaxDeclarationStatus.Rejected => "Correction required",
+            _ => "Operational readiness"
+        };
+    }
+
+    private static int GetStageIndex(TaxDeclarationStatus status, bool paymentRequired)
+    {
+        return status switch
+        {
+            TaxDeclarationStatus.ToPrepare or TaxDeclarationStatus.InPreparation or TaxDeclarationStatus.Rejected => 0,
+            TaxDeclarationStatus.SubmittedForReview or TaxDeclarationStatus.ApprovedLevel1 or TaxDeclarationStatus.ApprovedLevel2 => 1,
+            TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission or TaxDeclarationStatus.Submitted => paymentRequired && status == TaxDeclarationStatus.Submitted ? 3 : 2,
+            TaxDeclarationStatus.PaymentPending or TaxDeclarationStatus.Paid => 3,
+            TaxDeclarationStatus.Closed => 4,
+            _ => 0
+        };
+    }
+
+    private static string GetStepState(int index, int currentIndex, bool paymentRequired, TaxDeclarationStatus status)
+    {
+        if (index == 3 && !paymentRequired)
+        {
+            return "skipped";
+        }
+
+        if (status is TaxDeclarationStatus.Cancelled or TaxDeclarationStatus.NotApplicable)
+        {
+            return index == currentIndex ? "blocked" : "pending";
+        }
+
+        if (status == TaxDeclarationStatus.Rejected && index == 0)
+        {
+            return "blocked";
+        }
+
+        if (index < currentIndex)
+        {
+            return "done";
+        }
+
+        return index == currentIndex ? "active" : "pending";
+    }
+
+    private static NextAction GetNextAction(
+        TaxDeclarationStatus status,
+        bool paymentRequired,
+        bool hasSubmissionProof,
+        bool hasPaymentProof,
+        bool hasPaymentRecord)
+    {
+        return status switch
+        {
+            TaxDeclarationStatus.ToPrepare => new NextAction("Start preparation", "Assigned preparer", "The declaration is waiting for preparation to begin."),
+            TaxDeclarationStatus.InPreparation => new NextAction("Submit for review", "Assigned preparer", "Complete the working file and submit it for approval."),
+            TaxDeclarationStatus.Rejected => new NextAction("Correct and resubmit", "Assigned preparer", "The declaration was rejected and requires correction."),
+            TaxDeclarationStatus.SubmittedForReview or TaxDeclarationStatus.ApprovedLevel1 or TaxDeclarationStatus.ApprovedLevel2 => new NextAction("Approval required", "Configured approver", "The next approval level must validate or reject the declaration."),
+            TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission when !hasSubmissionProof => new NextAction("Attach submission proof", "Submission owner", "Submission proof is required before marking the declaration as submitted."),
+            TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission => new NextAction("Mark submitted", "Submission owner", "Enter the tax authority reference and confirm submission."),
+            TaxDeclarationStatus.Submitted when paymentRequired => new NextAction("Payment pending", "Finance manager", "The declaration has been submitted and now requires payment tracking."),
+            TaxDeclarationStatus.Submitted => new NextAction("Close declaration", "Tax manager", "Submission is complete and payment is not required."),
+            TaxDeclarationStatus.PaymentPending when !hasPaymentProof => new NextAction("Attach payment proof", "Finance manager", "Payment proof is required before marking this declaration as paid."),
+            TaxDeclarationStatus.PaymentPending => new NextAction("Mark paid", "Finance manager", "Confirm amount, currency and banking or fiscal reference."),
+            TaxDeclarationStatus.Paid when !hasPaymentRecord => new NextAction("Review payment record", "Finance manager", "The status is paid, but no payment record is visible."),
+            TaxDeclarationStatus.Paid => new NextAction("Close declaration", "Tax manager", "Payment evidence is available and the declaration can be closed."),
+            TaxDeclarationStatus.Closed => new NextAction("Closed", "No action", "The compliance cycle is complete."),
+            TaxDeclarationStatus.Cancelled => new NextAction("Cancelled", "No action", "This declaration was cancelled."),
+            TaxDeclarationStatus.NotApplicable => new NextAction("Not applicable", "No action", "This declaration is not applicable for the period."),
+            TaxDeclarationStatus.Late => new NextAction("Resolve lateness", "Tax manager", "The declaration is late and requires immediate action."),
+            _ => new NextAction("Review status", "Tax manager", "The declaration requires operational review.")
+        };
+    }
+
+    private static string GetStatusLabel(TaxDeclarationStatus status)
+    {
+        return status switch
+        {
+            TaxDeclarationStatus.ToPrepare => "To prepare",
+            TaxDeclarationStatus.InPreparation => "In preparation",
+            TaxDeclarationStatus.SubmittedForReview => "Submitted for review",
+            TaxDeclarationStatus.ApprovedLevel1 => "Approved level 1",
+            TaxDeclarationStatus.ApprovedLevel2 => "Approved level 2",
+            TaxDeclarationStatus.ApprovedLevel3 => "Approved level 3",
+            TaxDeclarationStatus.ReadyForSubmission => "Ready for submission",
+            TaxDeclarationStatus.PaymentPending => "Payment pending",
+            TaxDeclarationStatus.NotApplicable => "Not applicable",
+            _ => status.ToString()
+        };
+    }
+
+    private static string GetStatusClass(TaxDeclarationStatus status, bool isLate)
+    {
+        if (isLate || status is TaxDeclarationStatus.Late or TaxDeclarationStatus.Rejected or TaxDeclarationStatus.Cancelled)
+        {
+            return "status-danger";
+        }
+
+        if (status is TaxDeclarationStatus.PaymentPending or TaxDeclarationStatus.ToPrepare or TaxDeclarationStatus.InPreparation or TaxDeclarationStatus.SubmittedForReview)
+        {
+            return "status-warning";
+        }
+
+        return "status-active";
+    }
+
+    private static string GetDocumentTypeLabel(DocumentType type)
+    {
+        return type switch
+        {
+            DocumentType.TaxReturnDraft => "Tax return draft",
+            DocumentType.SubmissionProof => "Submission proof",
+            DocumentType.PaymentProof => "Payment proof",
+            DocumentType.TaxAuthorityCorrespondence => "Tax authority correspondence",
+            DocumentType.InternalNote => "Internal note",
+            _ => type.ToString()
+        };
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+        {
+            return $"{bytes / 1024m / 1024m:0.##} MB";
+        }
+
+        if (bytes >= 1024)
+        {
+            return $"{bytes / 1024m:0.##} KB";
+        }
+
+        return $"{bytes} bytes";
+    }
+
+    private static bool IsSuccessMessage(string message)
+    {
+        return message.Contains("completed", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("uploaded", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("submitted", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("deleted", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

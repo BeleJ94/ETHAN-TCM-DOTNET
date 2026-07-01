@@ -1,0 +1,17 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+TestResults/
+.tools/
+*.user
+*.suo
+*.rsuser
+*.nupkg
+*.snupkg
+*.log
+appsettings.Local.json
+artifacts/
+src/EthanTcm.Web/App_Data/Documents/
+tests/EthanTcm.Tests/artifacts/

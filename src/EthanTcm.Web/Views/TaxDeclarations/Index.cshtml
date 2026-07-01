@@ -1,0 +1,126 @@
+@using Microsoft.AspNetCore.Authorization
+@using EthanTcm.Domain.Enums
+@inject IAuthorizationService AuthorizationService
+@model TaxDeclarationWorkflowIndexViewModel
+
+@{
+    ViewData["Title"] = "Tax Declarations";
+    var canGenerateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.GenerateTaxDeclarations)).Succeeded;
+    var canCreateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.CreateTaxDeclarations)).Succeeded;
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Tax Declarations</h1>
+            <p>Track preparation, review, submission and payment workflow.</p>
+        </div>
+        @if (canGenerateDeclarations || canCreateDeclarations)
+        {
+            <div class="form-actions">
+                @if (canGenerateDeclarations)
+                {
+                    <a class="btn btn-outline-primary" asp-action="Generate"><svg class="icon"><use href="#icon-plus"></use></svg>Generate</a>
+                }
+                @if (canCreateDeclarations)
+                {
+                    <a class="btn btn-outline-secondary" asp-action="Manual"><svg class="icon"><use href="#icon-edit"></use></svg>Manual</a>
+                }
+            </div>
+        }
+    </div>
+
+    <section class="panel">
+        <form method="get" class="filter-form declaration-server-filters">
+            <div>
+                <label class="form-label" for="search">Recherche</label>
+                <input class="form-control"
+                       id="search"
+                       name="search"
+                       value="@Model.Search"
+                       placeholder="Taxe, période ou responsable" />
+            </div>
+            <div>
+                <label class="form-label" for="status">Statut</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">Tous les statuts</option>
+                    @foreach (var status in Enum.GetValues<TaxDeclarationStatus>())
+                    {
+                        <option value="@status" selected="@(Model.Status == status)">@status</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="pageSize">Lignes par page</label>
+                <select class="form-select" id="pageSize" name="pageSize">
+                    @foreach (var size in new[] { 10, 25, 50, 100 })
+                    {
+                        <option value="@size" selected="@(Model.PageSize == size)">@size</option>
+                    }
+                </select>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Filtrer</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Réinitialiser</a>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                <tr>
+                    <th>Obligation</th>
+                    <th>Period</th>
+                    <th>Due date</th>
+                    <th>Status</th>
+                    <th>Assigned to</th>
+                    <th>Prepared by</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.ObligationName</td>
+                        <td>@item.PeriodLabel</td>
+                        <td>@item.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td><span class="status-pill status-active">@item.Status</span></td>
+                        <td>@item.AssignedTo</td>
+                        <td>
+                            <span class="identity-stack">
+                                <strong>@item.PreparedBy</strong>
+                                <small>@(item.PreparedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Not prepared")</small>
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@item.Id"><svg class="icon"><use href="#icon-open"></use></svg>Open</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="data-table-footer declaration-server-pagination">
+            <div class="data-table-summary">
+                @Model.TotalCount déclaration(s) — page @Model.Page sur @Model.TotalPages
+            </div>
+            <div class="data-table-pagination">
+                <a class="btn btn-outline-secondary btn-sm @(Model.Page <= 1 ? "disabled" : null)"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-status="@Model.Status"
+                   asp-route-page="@(Model.Page - 1)"
+                   asp-route-pageSize="@Model.PageSize">Précédent</a>
+                <span class="data-table-page-status">Page @Model.Page / @Model.TotalPages</span>
+                <a class="btn btn-outline-secondary btn-sm @(Model.Page >= Model.TotalPages ? "disabled" : null)"
+                   asp-action="Index"
+                   asp-route-search="@Model.Search"
+                   asp-route-status="@Model.Status"
+                   asp-route-page="@(Model.Page + 1)"
+                   asp-route-pageSize="@Model.PageSize">Suivant</a>
+            </div>
+        </div>
+    </section>
+</section>

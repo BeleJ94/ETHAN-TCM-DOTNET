@@ -1,0 +1,40 @@
+@model AccountProfileViewModel
+
+@{
+    ViewData["Title"] = "Profile";
+}
+
+<section class="page-shell">
+    <div class="page-heading">
+        <div>
+            <h1>Profile</h1>
+            <p>Current authenticated ETHAN TCM user.</p>
+        </div>
+    </div>
+
+    <div class="profile-grid">
+        <section class="panel">
+            <h2>Identity</h2>
+            <dl class="detail-list">
+                <dt>Login</dt>
+                <dd>@Model.Login</dd>
+                <dt>Name</dt>
+                <dd>@Model.DisplayName</dd>
+                <dt>Email</dt>
+                <dd>@(Model.Email ?? "-")</dd>
+                <dt>Status</dt>
+                <dd>@(Model.IsActive ? "Active" : "Inactive")</dd>
+            </dl>
+        </section>
+
+        <section class="panel">
+            <h2>Roles</h2>
+            <div class="role-list">
+                @foreach (var role in Model.Roles)
+                {
+                    <span class="role-pill">@role</span>
+                }
+            </div>
+        </section>
+    </div>
+</section>

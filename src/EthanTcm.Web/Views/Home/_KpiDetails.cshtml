@@ -1,0 +1,99 @@
+@model DashboardMetricDetailsDto
+
+<div class="kpi-detail-header">
+    <div>
+        <span class="eyebrow">Composition de l’indicateur</span>
+        <h2 class="h5 mb-1">@Model.Title</h2>
+        <p>@Model.Definition</p>
+    </div>
+    <div class="kpi-detail-total">
+        <strong>@Model.TotalCount</strong>
+        <span>élément(s)</span>
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="kpi-detail-empty">
+        <svg class="icon icon-lg"><use href="#icon-check"></use></svg>
+        <strong>Aucun élément à traiter</strong>
+        <span>Le périmètre actuel ne contient aucune anomalie pour cet indicateur.</span>
+    </div>
+}
+else
+{
+    <div class="table-responsive kpi-detail-table">
+        <table class="table table-sm align-middle">
+            <thead>
+            <tr>
+                <th>Taxe</th>
+                <th>Période</th>
+                <th>Échéance</th>
+                <th>Statut</th>
+                <th>Risque</th>
+                <th>Responsable</th>
+                <th>Décision attendue</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Items)
+            {
+                var issueClass = item.DaysLate > 0 ? "status-danger" :
+                    item.RiskLevel is EthanTcm.Domain.Enums.RiskLevel.High or EthanTcm.Domain.Enums.RiskLevel.Critical
+                        ? "status-warning"
+                        : "status-active";
+                <tr>
+                    <td><strong>@item.Name</strong></td>
+                    <td>@(item.PeriodLabel ?? "—")</td>
+                    <td>
+                        @(item.DueDate?.ToString("dd/MM/yyyy") ?? "—")
+                        @if (item.DaysLate > 0)
+                        {
+                            <small class="d-block text-danger">@item.DaysLate jour(s) de retard</small>
+                        }
+                    </td>
+                    <td>@item.Status</td>
+                    <td>@item.RiskLevel</td>
+                    <td>@(item.AssignedTo ?? "Non attribué")</td>
+                    <td><span class="status-pill @issueClass">@item.Issue</span></td>
+                    <td class="text-end">
+                        @if (item.TargetType == DashboardDetailTargetType.TaxDeclaration)
+                        {
+                            <a class="btn btn-sm btn-outline-primary"
+                               asp-controller="TaxDeclarations"
+                               asp-action="Details"
+                               asp-route-id="@item.Id">Ouvrir</a>
+                        }
+                        else
+                        {
+                            <a class="btn btn-sm btn-outline-primary"
+                               asp-controller="TaxObligations"
+                               asp-action="Details"
+                               asp-route-id="@item.Id">Ouvrir</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="kpi-detail-footer">
+    <span>Page @Model.Page sur @Model.TotalPages</span>
+    <div class="data-table-pagination">
+        <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page <= 1 ? "disabled" : null)"
+           asp-controller="Home"
+           asp-action="KpiDetails"
+           asp-route-metric="@Model.Metric"
+           asp-route-page="@(Model.Page - 1)"
+           asp-route-pageSize="@Model.PageSize">Précédent</a>
+        <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page >= Model.TotalPages ? "disabled" : null)"
+           asp-controller="Home"
+           asp-action="KpiDetails"
+           asp-route-metric="@Model.Metric"
+           asp-route-page="@(Model.Page + 1)"
+           asp-route-pageSize="@Model.PageSize">Suivant</a>
+    </div>
+</div>
