@@ -18,17 +18,72 @@ public class HomeController(IDashboardService dashboardService) : Controller
 
     [HttpGet]
     public async Task<IActionResult> KpiDetails(
+        DashboardView view,
         DashboardMetric metric,
         int page = 1,
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
         var details = await dashboardService.GetMetricDetailsAsync(
+            view,
             metric,
             page,
             pageSize,
             cancellationToken);
         return PartialView("_KpiDetails", details);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportKpiDetails(
+        DashboardView view,
+        DashboardMetric metric,
+        DashboardExportFormat format,
+        CancellationToken cancellationToken = default)
+    {
+        var export = await dashboardService.ExportMetricDetailsAsync(
+            view,
+            metric,
+            format,
+            cancellationToken);
+
+        return File(export.Content, export.ContentType, export.FileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ChartDetails(
+        DashboardView view,
+        DashboardChartType chart,
+        string segmentKey,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var details = await dashboardService.GetChartSegmentDetailsAsync(
+            view,
+            chart,
+            segmentKey,
+            page,
+            pageSize,
+            cancellationToken);
+        return PartialView("_KpiDetails", details);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportChartDetails(
+        DashboardView view,
+        DashboardChartType chart,
+        string segmentKey,
+        DashboardExportFormat format,
+        CancellationToken cancellationToken = default)
+    {
+        var export = await dashboardService.ExportChartSegmentDetailsAsync(
+            view,
+            chart,
+            segmentKey,
+            format,
+            cancellationToken);
+
+        return File(export.Content, export.ContentType, export.FileName);
     }
 
     public IActionResult Privacy()

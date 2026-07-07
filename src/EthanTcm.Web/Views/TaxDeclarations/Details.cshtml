@@ -208,34 +208,6 @@
                             <dl class="stage-meta-list responsibility-meta-list">
                                 <dt>Expected</dt>
                                 <dd>@declaration.AssignedTo</dd>
-                                <dt>Actual</dt>
-                                <dd>@declaration.PreparedBy</dd>
-                                <dt>Date</dt>
-                                <dd>@(declaration.PreparedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                                <dt>Evidence</dt>
-                                <dd>
-                                    @if (preparationProof is null)
-                                    {
-                                        @("-")
-                                    }
-                                    else
-                                    {
-                                        <span class="document-evidence-link">
-                                            <span>@preparationProof.FileName</span>
-                                            @if (canDownloadDocuments)
-                                            {
-                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
-                                                        data-document-preview
-                                                        data-document-title="@preparationProof.FileName"
-                                                        data-document-type="@preparationProof.ContentType"
-                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = preparationProof.Id })"
-                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = preparationProof.Id })">
-                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
-                                                </button>
-                                            }
-                                        </span>
-                                    }
-                                </dd>
                             </dl>
                         </div>
                         @if (canPrepare && declaration.Status == TaxDeclarationStatus.ToPrepare)
@@ -361,34 +333,6 @@
                             <dl class="stage-meta-list responsibility-meta-list">
                                 <dt>Expected</dt>
                                 <dd>@declaration.ExpectedSubmissionOwner</dd>
-                                <dt>Actual</dt>
-                                <dd>@declaration.SubmittedBy</dd>
-                                <dt>Date</dt>
-                                <dd>@(declaration.SubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                                <dt>Evidence</dt>
-                                <dd>
-                                    @if (submissionProof is null)
-                                    {
-                                        @("-")
-                                    }
-                                    else
-                                    {
-                                        <span class="document-evidence-link">
-                                            <span>@submissionProof.FileName</span>
-                                            @if (canDownloadDocuments)
-                                            {
-                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
-                                                        data-document-preview
-                                                        data-document-title="@submissionProof.FileName"
-                                                        data-document-type="@submissionProof.ContentType"
-                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = submissionProof.Id })"
-                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = submissionProof.Id })">
-                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
-                                                </button>
-                                            }
-                                        </span>
-                                    }
-                                </dd>
                             </dl>
                         </div>
                         @if (canPrepare && declaration.Status is (TaxDeclarationStatus.ApprovedLevel3 or TaxDeclarationStatus.ReadyForSubmission))
@@ -473,34 +417,6 @@
                             <dl class="stage-meta-list responsibility-meta-list">
                                 <dt>Expected</dt>
                                 <dd>@declaration.ExpectedPaymentOwner</dd>
-                                <dt>Actual</dt>
-                                <dd>@(latestPayment?.PaidBy ?? "-")</dd>
-                                <dt>Date</dt>
-                                <dd>@(latestPayment?.PaidAt.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                                <dt>Evidence</dt>
-                                <dd>
-                                    @if (paymentProof is null)
-                                    {
-                                        @("-")
-                                    }
-                                    else
-                                    {
-                                        <span class="document-evidence-link">
-                                            <span>@paymentProof.FileName</span>
-                                            @if (canDownloadDocuments)
-                                            {
-                                                <button class="btn btn-sm btn-outline-primary document-preview-button" type="button"
-                                                        data-document-preview
-                                                        data-document-title="@paymentProof.FileName"
-                                                        data-document-type="@paymentProof.ContentType"
-                                                        data-document-preview-url="@Url.Action("PreviewDocument", new { id = paymentProof.Id })"
-                                                        data-document-download-url="@Url.Action("DownloadDocument", new { id = paymentProof.Id })">
-                                                    <svg class="icon"><use href="#icon-open"></use></svg>Preview
-                                                </button>
-                                            }
-                                        </span>
-                                    }
-                                </dd>
                             </dl>
                         </div>
                         @if (canManagePayments && declaration.PaymentRequired && declaration.Status == TaxDeclarationStatus.PaymentPending)
@@ -616,12 +532,6 @@
                             <dl class="stage-meta-list responsibility-meta-list">
                                 <dt>Expected</dt>
                                 <dd>@declaration.ExpectedClosureOwner</dd>
-                                <dt>Actual</dt>
-                                <dd>@declaration.ClosedBy</dd>
-                                <dt>Date</dt>
-                                <dd>@(declaration.ClosedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</dd>
-                                <dt>Evidence</dt>
-                                <dd><span class="status-pill @(canClose ? "status-active" : "status-warning")">@(canClose ? "Ready" : "Blocked")</span></dd>
                             </dl>
                         </div>
                         @if (canCloseAction && declaration.Status is (TaxDeclarationStatus.Submitted or TaxDeclarationStatus.Paid))
@@ -802,32 +712,6 @@
                         }
                     </ul>
                 </details>
-            </section>
-
-            <section class="panel">
-                <h2>Operational owners</h2>
-                <dl class="detail-list operational-detail-list">
-                    <dt>Preparer expected</dt>
-                    <dd>@declaration.AssignedTo</dd>
-                    <dt>Preparer actual</dt>
-                    <dd>@declaration.PreparedBy</dd>
-                    <dt>Submission expected</dt>
-                    <dd>@declaration.ExpectedSubmissionOwner</dd>
-                    <dt>Submission actual</dt>
-                    <dd>@declaration.SubmittedBy</dd>
-                    <dt>Payment expected</dt>
-                    <dd>@declaration.ExpectedPaymentOwner</dd>
-                    <dt>Payment actual</dt>
-                    <dd>@(latestPayment?.PaidBy ?? "-")</dd>
-                    <dt>Closure expected</dt>
-                    <dd>@declaration.ExpectedClosureOwner</dd>
-                    <dt>Closure actual</dt>
-                    <dd>@declaration.ClosedBy</dd>
-                    <dt>Reference</dt>
-                    <dd>@(string.IsNullOrWhiteSpace(declaration.SubmissionReference) ? "-" : declaration.SubmissionReference)</dd>
-                    <dt>Close ready</dt>
-                    <dd><span class="status-pill @(canClose ? "status-active" : "status-warning")">@(canClose ? "Ready" : "Blocked")</span></dd>
-                </dl>
             </section>
 
             @if (canManageLifecycle && !isTerminal)

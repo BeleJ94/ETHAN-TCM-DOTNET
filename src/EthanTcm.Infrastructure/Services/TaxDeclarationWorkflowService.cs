@@ -575,9 +575,9 @@ public sealed class TaxDeclarationWorkflowService(
 
         if (!currentUserService.IsInRole(ApplicationRoles.Administrator) &&
             !currentUserService.IsInRole(ApplicationRoles.TaxManager) &&
-            currentUserService.UserId != declaration.AssignedToUserId)
+            !IsAssignedOrConfiguredPreparer(declaration))
         {
-            throw new InvalidOperationException("Only the assigned preparer can perform this action.");
+            throw new InvalidOperationException("Only the assigned or configured preparer can perform this action.");
         }
     }
 
@@ -638,10 +638,24 @@ public sealed class TaxDeclarationWorkflowService(
 
         if (!currentUserService.IsInRole(ApplicationRoles.Administrator) &&
             !currentUserService.IsInRole(ApplicationRoles.TaxManager) &&
-            currentUserService.UserId != declaration.AssignedToUserId)
+            !IsAssignedOrConfiguredPreparer(declaration))
         {
-            throw new InvalidOperationException("Only the assigned preparer can submit this declaration.");
+            throw new InvalidOperationException("Only the assigned or configured preparer can submit this declaration.");
         }
+    }
+
+    private bool IsAssignedOrConfiguredPreparer(TaxDeclaration declaration)
+    {
+        if (!currentUserService.UserId.HasValue)
+        {
+            return false;
+        }
+
+        var currentUserId = currentUserService.UserId.Value;
+        return declaration.AssignedToUserId == currentUserId ||
+            declaration.TaxObligation?.Responsibles.Any(responsible =>
+                responsible.Type == ResponsibleType.Preparer &&
+                responsible.UserId == currentUserId) == true;
     }
 
     private bool CanRecordPayment(TaxDeclaration declaration)

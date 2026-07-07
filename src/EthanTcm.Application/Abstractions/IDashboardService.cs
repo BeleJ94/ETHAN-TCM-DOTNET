@@ -6,9 +6,28 @@ public interface IDashboardService
 {
     Task<DashboardDto> GetAsync(DashboardView view, CancellationToken cancellationToken = default);
     Task<DashboardMetricDetailsDto> GetMetricDetailsAsync(
+        DashboardView view,
         DashboardMetric metric,
         int page,
         int pageSize,
+        CancellationToken cancellationToken = default);
+    Task<DashboardMetricExportDto> ExportMetricDetailsAsync(
+        DashboardView view,
+        DashboardMetric metric,
+        DashboardExportFormat format,
+        CancellationToken cancellationToken = default);
+    Task<DashboardMetricDetailsDto> GetChartSegmentDetailsAsync(
+        DashboardView view,
+        DashboardChartType chart,
+        string segmentKey,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+    Task<DashboardMetricExportDto> ExportChartSegmentDetailsAsync(
+        DashboardView view,
+        DashboardChartType chart,
+        string segmentKey,
+        DashboardExportFormat format,
         CancellationToken cancellationToken = default);
 }
 
@@ -39,11 +58,26 @@ public enum DashboardMetric
     PenaltyRisk = 10
 }
 
+public enum DashboardExportFormat
+{
+    Excel = 0,
+    Pdf = 1
+}
+
+public enum DashboardChartType
+{
+    DueDateBuckets = 0,
+    StatusDistribution = 1,
+    RiskDistribution = 2,
+    OwnerWorkload = 3
+}
+
 public sealed record DashboardDto(
     DashboardView ActiveView,
     DateOnly Today,
     DateTimeOffset GeneratedAt,
     DashboardMetricsDto Metrics,
+    DashboardChartsDto Charts,
     IReadOnlyCollection<DashboardDeclarationItemDto> Items,
     IReadOnlyCollection<DashboardObligationIssueDto> ObligationIssues);
 
@@ -80,6 +114,19 @@ public sealed record DashboardObligationIssueDto(
     RiskLevel RiskLevel,
     string Issue);
 
+public sealed record DashboardChartsDto(
+    IReadOnlyCollection<DashboardChartPointDto> DueDateBuckets,
+    IReadOnlyCollection<DashboardChartPointDto> StatusDistribution,
+    IReadOnlyCollection<DashboardChartPointDto> RiskDistribution,
+    IReadOnlyCollection<DashboardChartPointDto> OwnerWorkload);
+
+public sealed record DashboardChartPointDto(
+    string Key,
+    string Label,
+    int Value,
+    decimal Percent,
+    string Tone);
+
 public enum DashboardDetailTargetType
 {
     TaxDeclaration = 0,
@@ -87,13 +134,18 @@ public enum DashboardDetailTargetType
 }
 
 public sealed record DashboardMetricDetailsDto(
+    DashboardView View,
     DashboardMetric Metric,
     string Title,
     string Definition,
     int TotalCount,
     int Page,
     int PageSize,
-    IReadOnlyCollection<DashboardMetricDetailItemDto> Items)
+    IReadOnlyCollection<DashboardMetricDetailItemDto> Items,
+    string DetailAction = "KpiDetails",
+    string ExportAction = "ExportKpiDetails",
+    DashboardChartType? Chart = null,
+    string? SegmentKey = null)
 {
     public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
 }
@@ -109,3 +161,8 @@ public sealed record DashboardMetricDetailItemDto(
     string? AssignedTo,
     string Issue,
     int DaysLate);
+
+public sealed record DashboardMetricExportDto(
+    string FileName,
+    string ContentType,
+    byte[] Content);

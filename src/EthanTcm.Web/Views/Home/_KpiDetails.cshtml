@@ -1,14 +1,71 @@
 @model DashboardMetricDetailsDto
+@using Microsoft.AspNetCore.Routing
+
+@{
+    var excelRoute = new RouteValueDictionary
+    {
+        ["view"] = Model.View,
+        ["format"] = DashboardExportFormat.Excel
+    };
+    var pdfRoute = new RouteValueDictionary
+    {
+        ["view"] = Model.View,
+        ["format"] = DashboardExportFormat.Pdf
+    };
+    var previousRoute = new RouteValueDictionary
+    {
+        ["view"] = Model.View,
+        ["page"] = Model.Page - 1,
+        ["pageSize"] = Model.PageSize
+    };
+    var nextRoute = new RouteValueDictionary
+    {
+        ["view"] = Model.View,
+        ["page"] = Model.Page + 1,
+        ["pageSize"] = Model.PageSize
+    };
+
+    if (Model.Chart.HasValue)
+    {
+        excelRoute["chart"] = Model.Chart.Value;
+        excelRoute["segmentKey"] = Model.SegmentKey;
+        pdfRoute["chart"] = Model.Chart.Value;
+        pdfRoute["segmentKey"] = Model.SegmentKey;
+        previousRoute["chart"] = Model.Chart.Value;
+        previousRoute["segmentKey"] = Model.SegmentKey;
+        nextRoute["chart"] = Model.Chart.Value;
+        nextRoute["segmentKey"] = Model.SegmentKey;
+    }
+    else
+    {
+        excelRoute["metric"] = Model.Metric;
+        pdfRoute["metric"] = Model.Metric;
+        previousRoute["metric"] = Model.Metric;
+        nextRoute["metric"] = Model.Metric;
+    }
+}
 
 <div class="kpi-detail-header">
     <div>
-        <span class="eyebrow">Composition de l’indicateur</span>
+        <span class="eyebrow">Composition de l'indicateur</span>
         <h2 class="h5 mb-1">@Model.Title</h2>
         <p>@Model.Definition</p>
     </div>
-    <div class="kpi-detail-total">
-        <strong>@Model.TotalCount</strong>
-        <span>élément(s)</span>
+    <div class="kpi-detail-actions">
+        <div class="kpi-detail-total">
+            <strong>@Model.TotalCount</strong>
+            <span>element(s)</span>
+        </div>
+        <div class="kpi-export-actions" aria-label="Exporter les details">
+            <a class="btn btn-sm btn-outline-primary"
+               href="@Url.Action(Model.ExportAction, "Home", excelRoute)">
+                <svg class="icon"><use href="#icon-download"></use></svg>Excel
+            </a>
+            <a class="btn btn-sm btn-outline-primary"
+               href="@Url.Action(Model.ExportAction, "Home", pdfRoute)">
+                <svg class="icon"><use href="#icon-download"></use></svg>PDF
+            </a>
+        </div>
     </div>
 </div>
 
@@ -16,8 +73,8 @@
 {
     <div class="kpi-detail-empty">
         <svg class="icon icon-lg"><use href="#icon-check"></use></svg>
-        <strong>Aucun élément à traiter</strong>
-        <span>Le périmètre actuel ne contient aucune anomalie pour cet indicateur.</span>
+        <strong>Aucun element a traiter</strong>
+        <span>Le perimetre actuel ne contient aucune anomalie pour cet indicateur.</span>
     </div>
 }
 else
@@ -27,12 +84,12 @@ else
             <thead>
             <tr>
                 <th>Taxe</th>
-                <th>Période</th>
-                <th>Échéance</th>
+                <th>Periode</th>
+                <th>Echeance</th>
                 <th>Statut</th>
                 <th>Risque</th>
                 <th>Responsable</th>
-                <th>Décision attendue</th>
+                <th>Decision attendue</th>
                 <th></th>
             </tr>
             </thead>
@@ -45,9 +102,9 @@ else
                         : "status-active";
                 <tr>
                     <td><strong>@item.Name</strong></td>
-                    <td>@(item.PeriodLabel ?? "—")</td>
+                    <td>@(item.PeriodLabel ?? "-")</td>
                     <td>
-                        @(item.DueDate?.ToString("dd/MM/yyyy") ?? "—")
+                        @(item.DueDate?.ToString("dd/MM/yyyy") ?? "-")
                         @if (item.DaysLate > 0)
                         {
                             <small class="d-block text-danger">@item.DaysLate jour(s) de retard</small>
@@ -55,7 +112,7 @@ else
                     </td>
                     <td>@item.Status</td>
                     <td>@item.RiskLevel</td>
-                    <td>@(item.AssignedTo ?? "Non attribué")</td>
+                    <td>@(item.AssignedTo ?? "Non attribue")</td>
                     <td><span class="status-pill @issueClass">@item.Issue</span></td>
                     <td class="text-end">
                         @if (item.TargetType == DashboardDetailTargetType.TaxDeclaration)
@@ -84,16 +141,8 @@ else
     <span>Page @Model.Page sur @Model.TotalPages</span>
     <div class="data-table-pagination">
         <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page <= 1 ? "disabled" : null)"
-           asp-controller="Home"
-           asp-action="KpiDetails"
-           asp-route-metric="@Model.Metric"
-           asp-route-page="@(Model.Page - 1)"
-           asp-route-pageSize="@Model.PageSize">Précédent</a>
+           href="@Url.Action(Model.DetailAction, "Home", previousRoute)">Precedent</a>
         <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page >= Model.TotalPages ? "disabled" : null)"
-           asp-controller="Home"
-           asp-action="KpiDetails"
-           asp-route-metric="@Model.Metric"
-           asp-route-page="@(Model.Page + 1)"
-           asp-route-pageSize="@Model.PageSize">Suivant</a>
+           href="@Url.Action(Model.DetailAction, "Home", nextRoute)">Suivant</a>
     </div>
 </div>

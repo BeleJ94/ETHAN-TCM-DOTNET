@@ -254,7 +254,7 @@ public sealed class TaxDocumentService(
         }
 
         return currentUserService.IsInRole(ApplicationRoles.Preparer) &&
-            currentUserService.UserId == declaration.AssignedToUserId;
+            IsAssignedOrConfiguredPreparer(declaration);
     }
 
     private bool CanDownload(TaxDeclaration declaration, Guid uploadedByUserId, DocumentType documentType)
@@ -284,6 +284,20 @@ public sealed class TaxDocumentService(
 
         return currentUserService.IsInRole(ApplicationRoles.FinanceManager) &&
             documentType == DocumentType.PaymentProof;
+    }
+
+    private bool IsAssignedOrConfiguredPreparer(TaxDeclaration declaration)
+    {
+        if (!currentUserService.UserId.HasValue)
+        {
+            return false;
+        }
+
+        var currentUserId = currentUserService.UserId.Value;
+        return declaration.AssignedToUserId == currentUserId ||
+            declaration.TaxObligation?.Responsibles.Any(responsible =>
+                responsible.Type == ResponsibleType.Preparer &&
+                responsible.UserId == currentUserId) == true;
     }
 
     private bool CanDelete(Guid assignedToUserId, Guid uploadedByUserId)

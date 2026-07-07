@@ -1,4 +1,5 @@
 @using EthanTcm.Domain.Enums
+@using System.Text.Json
 @using Microsoft.AspNetCore.Authorization
 @inject IAuthorizationService AuthorizationService
 @model DashboardViewModel
@@ -7,6 +8,16 @@
     ViewData["Title"] = "Dashboard";
     var dashboard = Model.Dashboard;
     var metrics = dashboard.Metrics;
+    var charts = dashboard.Charts;
+    var chartPayload = new
+    {
+        detailBaseUrl = Url.Action("ChartDetails", "Home", new { view = dashboard.ActiveView }),
+        dueDateBuckets = charts.DueDateBuckets,
+        statusDistribution = charts.StatusDistribution,
+        riskDistribution = charts.RiskDistribution,
+        ownerWorkload = charts.OwnerWorkload
+    };
+    var chartPayloadJson = JsonSerializer.Serialize(chartPayload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
     var canGenerateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.GenerateTaxDeclarations)).Succeeded;
     var canCreateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.CreateTaxDeclarations)).Succeeded;
     var dueTodayUrgencyClass = metrics.DueToday > 0 ? " metric-danger" : string.Empty;
@@ -17,10 +28,19 @@
     {
         DashboardView.MyTasks => "Mes tâches",
         DashboardView.TeamTasks => "Tâches de l’équipe",
-        DashboardView.ManagementOverview => "Vue management",
+        DashboardView.ManagementOverview => "Supervision",
         DashboardView.LateItems => "Éléments en retard",
         DashboardView.ComplianceOverview => "Conformité",
         _ => dashboard.ActiveView.ToString()
+    };
+    var activeViewDescription = dashboard.ActiveView switch
+    {
+        DashboardView.MyTasks => "Déclarations qui nécessitent une action de votre part.",
+        DashboardView.TeamTasks => "Charge ouverte visible dans votre périmètre opérationnel.",
+        DashboardView.ManagementOverview => "Vue de supervision avec les déclarations ouvertes et les anomalies de responsabilité.",
+        DashboardView.LateItems => "Déclarations dont l’échéance est dépassée et qui demandent une action rapide.",
+        DashboardView.ComplianceOverview => "Dossiers présentant un risque de conformité ou une preuve réglementaire manquante.",
+        _ => "Vue filtrée du tableau de bord."
     };
 }
 
@@ -47,16 +67,37 @@
     </div>
 
     <nav class="dashboard-tabs" aria-label="Dashboard views">
-        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.MyTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.MyTasks">Mes tâches</a>
-        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.TeamTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.TeamTasks">Équipe</a>
-        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ManagementOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ManagementOverview">Management</a>
-        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.LateItems ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.LateItems">Retards</a>
-        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ComplianceOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview">Conformité</a>
+        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.MyTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.MyTasks">
+            <span>Mes tâches</span>
+            <small>À traiter par moi</small>
+        </a>
+        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.TeamTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.TeamTasks">
+            <span>Équipe</span>
+            <small>Charge ouverte</small>
+        </a>
+        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ManagementOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ManagementOverview">
+            <span>Supervision</span>
+            <small>Vue globale</small>
+        </a>
+        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.LateItems ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.LateItems">
+            <span>Retards</span>
+            <small>Échéances dépassées</small>
+        </a>
+        <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ComplianceOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview">
+            <span>Conformité</span>
+            <small>Risques et preuves</small>
+        </a>
     </nav>
+
+    <section class="dashboard-view-note" aria-label="Filtre actif">
+        <span>Filtre actif</span>
+        <strong>@activeViewLabel</strong>
+        <p>@activeViewDescription</p>
+    </section>
 
     <section class="dashboard-context-strip" aria-label="Contexte du tableau de bord">
         <div>
-            <span>Périmètre actif</span>
+            <span>Vue active</span>
             <strong>@activeViewLabel</strong>
         </div>
         <div>
@@ -73,6 +114,90 @@
         </div>
     </section>
 
+    <section class="dashboard-analytics" aria-labelledby="dashboard-analytics-title">
+        <div class="dashboard-kpi-heading">
+            <div>
+                <span class="eyebrow">Vue analytique</span>
+                <h2 id="dashboard-analytics-title">Lecture rapide de la charge</h2>
+            </div>
+            <p>Reperez les blocages par echeance, statut, niveau de risque et responsable.</p>
+        </div>
+        <div class="dashboard-analytics-grid">
+            <article class="analytics-panel analytics-panel-wide">
+                <div class="analytics-panel-header">
+                    <div>
+                        <h3>Charge par echeance</h3>
+                        <p>Histogramme des actions selon leur urgence.</p>
+                    </div>
+                    <strong>@metrics.OpenDeclarations</strong>
+                </div>
+                <div class="analytics-chart-frame analytics-chart-frame-wide">
+                    <canvas id="dueDateChart" aria-label="Charge par echeance" role="img"></canvas>
+                </div>
+                <div class="analytics-legend">
+                    @foreach (var point in charts.DueDateBuckets)
+                    {
+                        <span class="analytics-legend-item analytics-tone-@point.Tone"><i></i>@point.Label <strong>@point.Value</strong></span>
+                    }
+                </div>
+            </article>
+
+            <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <h3>Statuts</h3>
+                        <p>Donut du workflow ouvert.</p>
+                    </div>
+                </div>
+                <div class="analytics-chart-frame analytics-chart-frame-donut">
+                    <canvas id="statusChart" aria-label="Repartition par statut" role="img"></canvas>
+                </div>
+                <div class="analytics-legend analytics-legend-compact">
+                    @foreach (var point in charts.StatusDistribution)
+                    {
+                        <span class="analytics-legend-item analytics-tone-@point.Tone"><i></i>@point.Label <strong>@point.Value</strong></span>
+                    }
+                </div>
+            </article>
+
+            <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <h3>Risques</h3>
+                        <p>Donut de criticite fiscale.</p>
+                    </div>
+                </div>
+                <div class="analytics-chart-frame analytics-chart-frame-donut">
+                    <canvas id="riskChart" aria-label="Repartition par risque" role="img"></canvas>
+                </div>
+                <div class="analytics-legend analytics-legend-compact">
+                    @foreach (var point in charts.RiskDistribution)
+                    {
+                        <span class="analytics-legend-item analytics-tone-@point.Tone"><i></i>@point.Label <strong>@point.Value</strong></span>
+                    }
+                </div>
+            </article>
+
+            <article class="analytics-panel">
+                <div class="analytics-panel-header">
+                    <div>
+                        <h3>Top responsables</h3>
+                        <p>Bar chart des owners les plus charges.</p>
+                    </div>
+                </div>
+                <div class="analytics-chart-frame">
+                    <canvas id="ownerChart" aria-label="Charge par responsable" role="img"></canvas>
+                </div>
+                <div class="analytics-legend analytics-legend-compact">
+                    @foreach (var point in charts.OwnerWorkload)
+                    {
+                        <span class="analytics-legend-item analytics-tone-@point.Tone"><i></i>@point.Label <strong>@point.Value</strong></span>
+                    }
+                </div>
+            </article>
+        </div>
+    </section>
+
     <section class="dashboard-kpi-group" aria-labelledby="priority-kpis">
         <div class="dashboard-kpi-heading">
             <div>
@@ -84,7 +209,7 @@
         <div class="dashboard-metrics dashboard-metrics-priority">
             <a class="metric metric-link js-kpi-card@(lateUrgencyClass)"
                asp-action="Index" asp-route-view="@DashboardView.LateItems"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.Late })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.Late })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
                 <span>Déclarations en retard</span>
@@ -93,7 +218,7 @@
             </a>
             <a class="metric metric-link js-kpi-card@(dueTodayUrgencyClass)"
                asp-action="Index" asp-route-view="@DashboardView.TeamTasks"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.DueToday })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueToday })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
                 <span>Échéances du jour</span>
@@ -102,7 +227,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-action="Index" asp-route-view="@DashboardView.TeamTasks"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.AwaitingApproval })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.AwaitingApproval })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-check"></use></svg></span>
                 <span>Validations en attente</span>
@@ -111,7 +236,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-controller="Payments" asp-action="Pending"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.PendingPayments })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.PendingPayments })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
                 <span>Paiements en attente</span>
@@ -132,7 +257,7 @@
         <div class="dashboard-metrics">
             <a class="metric metric-link js-kpi-card@(penaltyRiskUrgencyClass)"
                asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.PenaltyRisk })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.PenaltyRisk })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
                 <span>Exposition aux pénalités</span>
@@ -141,7 +266,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.MissingSubmissionProof })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.MissingSubmissionProof })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-paperclip"></use></svg></span>
                 <span>Preuves de dépôt manquantes</span>
@@ -150,7 +275,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-controller="Payments" asp-action="MissingProof"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.MissingPaymentProof })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.MissingPaymentProof })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
                 <span>Preuves de paiement manquantes</span>
@@ -159,7 +284,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-controller="TaxObligations" asp-action="Index"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.ObligationsWithoutResponsible })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.ObligationsWithoutResponsible })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-user"></use></svg></span>
                 <span>Taxes sans responsable</span>
@@ -180,7 +305,7 @@
         <div class="dashboard-metrics dashboard-metrics-planning">
             <a class="metric metric-link js-kpi-card@(dueSoonUrgencyClass)"
                asp-action="Index" asp-route-view="@DashboardView.TeamTasks"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.DueSoon })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueSoon })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-clock"></use></svg></span>
                 <span>Échéances sous 5 jours</span>
@@ -189,7 +314,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-action="Index" asp-route-view="@DashboardView.TeamTasks"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.DueThisWeek })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueThisWeek })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-clock"></use></svg></span>
                 <span>Échéances de la semaine</span>
@@ -198,7 +323,7 @@
             </a>
             <a class="metric metric-link js-kpi-card"
                asp-action="Index" asp-route-view="@DashboardView.TeamTasks"
-               data-kpi-url="@Url.Action("KpiDetails", "Home", new { metric = DashboardMetric.DueThisMonth })"
+               data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueThisMonth })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
                 <span>Échéances du mois</span>
@@ -325,3 +450,9 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script id="dashboard-chart-data" type="application/json">@Html.Raw(chartPayloadJson)</script>
+    <script src="~/js/dashboard-charts.js" asp-append-version="true"></script>
+}

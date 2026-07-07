@@ -102,6 +102,12 @@ Pour IIS :
 dotnet test EthanTcm.sln
 ```
 
+## Bibliotheques front embarquees
+
+- Chart.js 4.5.1 est embarque localement dans `src\EthanTcm.Web\wwwroot\lib\chartjs`.
+- Le dashboard charge `chart.umd.min.js` depuis l'application, sans CDN ni lien externe.
+- La licence MIT est conservee dans `src\EthanTcm.Web\wwwroot\lib\chartjs\LICENSE.md`.
+
 ## Performance
 
 - la liste des declarations utilise une recherche, un tri et une pagination SQL ;

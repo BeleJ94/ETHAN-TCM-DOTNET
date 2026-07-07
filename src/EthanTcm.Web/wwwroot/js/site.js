@@ -630,6 +630,17 @@
     }
   });
 
+  document.addEventListener("dashboard:open-details", (event) => {
+    const url = event.detail?.url;
+    if (!url) {
+      return;
+    }
+
+    modalTitle.textContent = event.detail?.title || "Detail du graphique";
+    modal.show();
+    loadDetails(url);
+  });
+
   modalElement.addEventListener("hidden.bs.modal", () => {
     requestController?.abort();
     requestController = null;

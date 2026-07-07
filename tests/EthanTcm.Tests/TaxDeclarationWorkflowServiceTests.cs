@@ -31,6 +31,60 @@ public sealed class TaxDeclarationWorkflowServiceTests
     }
 
     [Fact]
+    public async Task Configured_preparer_can_start_preparation_when_not_assigned()
+    {
+        var options = CreateOptions();
+        Guid declarationId;
+        Guid assignedPreparerId;
+        Guid configuredPreparerId;
+
+        await using (var dbContext = CreateDbContext(options))
+        {
+            var legalEntity = new LegalEntity("ETHAN", "ETHAN TCM", "CD", null);
+            var department = new Department("FINANCE", "Finance");
+            var category = new TaxCategory("VAT", "VAT");
+            var frequency = new TaxFrequency("MONTHLY", "Monthly", 12);
+            var assignedPreparer = new User("assigned-preparer", "Assigned Preparer", "assigned.preparer@local");
+            var configuredPreparer = new User("configured-preparer", "Configured Preparer", "configured.preparer@local");
+            var obligation = new TaxObligation(
+                legalEntity.Id,
+                department.Id,
+                category.Id,
+                frequency.Id,
+                assignedPreparer.Id,
+                "VAT Return",
+                RiskLevel.Medium,
+                requiresPayment: false,
+                DateTimeOffset.UtcNow);
+            obligation.AddResponsible(configuredPreparer.Id, ResponsibleType.Preparer, DateTimeOffset.UtcNow);
+            var period = new TaxPeriod(2026, 1, null, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), "2026-01");
+            var declaration = new TaxDeclaration(
+                obligation.Id,
+                period.Id,
+                new DateOnly(2026, 2, 15),
+                "2026-01",
+                paymentRequired: false,
+                assignedPreparer.Id);
+
+            dbContext.AddRange(legalEntity, department, category, frequency, assignedPreparer, configuredPreparer, obligation, period, declaration);
+            await dbContext.SaveChangesAsync();
+            declarationId = declaration.Id;
+            assignedPreparerId = assignedPreparer.Id;
+            configuredPreparerId = configuredPreparer.Id;
+        }
+
+        await using var actContext = CreateDbContext(options);
+        var service = CreateService(actContext, configuredPreparerId, ApplicationRoles.Preparer);
+
+        var result = await service.StartPreparationAsync(declarationId);
+        var updated = await actContext.TaxDeclarations.SingleAsync(item => item.Id == declarationId);
+
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.Equal(TaxDeclarationStatus.InPreparation, updated.Status);
+        Assert.Equal(assignedPreparerId, updated.AssignedToUserId);
+    }
+
+    [Fact]
     public async Task Submit_for_review_requires_preparation_proof()
     {
         var options = CreateOptions();
@@ -195,7 +249,7 @@ public sealed class TaxDeclarationWorkflowServiceTests
         var result = await service.MarkSubmittedAsync(setup.DeclarationId, "SUB-001");
 
         Assert.False(result.Success);
-        Assert.Contains("assigned preparer", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("configured preparer", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

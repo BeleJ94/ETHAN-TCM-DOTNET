@@ -115,6 +115,28 @@ public sealed class TaxDocumentServiceTests
     }
 
     [Fact]
+    public async Task Upload_allows_configured_preparer_when_not_assigned()
+    {
+        await using var dbContext = CreateDbContext();
+        var setup = await CreateDeclarationWithConfiguredPreparerAsync(dbContext);
+        var service = CreateService(dbContext, setup.ConfiguredPreparerId);
+        await using var content = new MemoryStream([1, 2, 3]);
+
+        var result = await service.UploadAsync(new TaxDocumentUploadCommand(
+            setup.DeclarationId,
+            DocumentType.TaxReturnDraft,
+            "preparation-proof.pdf",
+            "application/pdf",
+            content.Length,
+            content));
+
+        Assert.True(result.Success, result.ErrorMessage);
+        var document = await dbContext.TaxDocuments.SingleAsync(document => document.Id == result.TaxDocumentId);
+        Assert.Equal(DocumentType.TaxReturnDraft, document.DocumentType);
+        Assert.Equal(setup.ConfiguredPreparerId, document.UploadedByUserId);
+    }
+
+    [Fact]
     public async Task Download_ignores_logically_deleted_documents()
     {
         await using var dbContext = CreateDbContext();
@@ -194,6 +216,39 @@ public sealed class TaxDocumentServiceTests
         dbContext.AddRange(legalEntity, department, category, frequency, user, obligation, period, declaration);
         await dbContext.SaveChangesAsync();
         return (declaration.Id, user.Id);
+    }
+
+    private static async Task<(Guid DeclarationId, Guid AssignedPreparerId, Guid ConfiguredPreparerId)> CreateDeclarationWithConfiguredPreparerAsync(EthanTcmDbContext dbContext)
+    {
+        var legalEntity = new LegalEntity("ETHAN", "ETHAN TCM", "CD", null);
+        var department = new Department("FINANCE", "Finance");
+        var category = new TaxCategory("VAT", "VAT");
+        var frequency = new TaxFrequency("MONTHLY", "Monthly", 12);
+        var assignedPreparer = new User("assigned-preparer", "Assigned Preparer", "assigned.preparer@local");
+        var configuredPreparer = new User("configured-preparer", "Configured Preparer", "configured.preparer@local");
+        var obligation = new TaxObligation(
+            legalEntity.Id,
+            department.Id,
+            category.Id,
+            frequency.Id,
+            assignedPreparer.Id,
+            "VAT Return",
+            RiskLevel.Medium,
+            requiresPayment: false,
+            DateTimeOffset.UtcNow);
+        obligation.AddResponsible(configuredPreparer.Id, ResponsibleType.Preparer, DateTimeOffset.UtcNow);
+        var period = new TaxPeriod(2026, 1, null, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), "2026-01");
+        var declaration = new TaxDeclaration(
+            obligation.Id,
+            period.Id,
+            new DateOnly(2026, 2, 15),
+            "2026-01",
+            paymentRequired: false,
+            assignedPreparer.Id);
+
+        dbContext.AddRange(legalEntity, department, category, frequency, assignedPreparer, configuredPreparer, obligation, period, declaration);
+        await dbContext.SaveChangesAsync();
+        return (declaration.Id, assignedPreparer.Id, configuredPreparer.Id);
     }
 
     private static EthanTcmDbContext CreateDbContext()
