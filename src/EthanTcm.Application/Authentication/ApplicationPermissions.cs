@@ -17,6 +17,11 @@ public static class ApplicationPermissions
     public const string ImportTaxMatrix = "Permissions.TaxMatrix.Import";
     public const string ViewAuditLogs = "Permissions.AuditLogs.View";
     public const string RunAdministrationTasks = "Permissions.Administration.Run";
+    public const string ViewCorrespondence = "Permissions.Correspondence.View";
+    public const string CreateCorrespondence = "Permissions.Correspondence.Create";
+    public const string AssignCorrespondence = "Permissions.Correspondence.Assign";
+    public const string ProcessCorrespondence = "Permissions.Correspondence.Process";
+    public const string ValidateCorrespondence = "Permissions.Correspondence.Validate";
 
     public static readonly IReadOnlyDictionary<string, string[]> RolePermissions = new Dictionary<string, string[]>
     {
@@ -37,6 +42,7 @@ public static class ApplicationPermissions
             ImportTaxMatrix,
             ViewAuditLogs,
             RunAdministrationTasks
+            ,ViewCorrespondence, CreateCorrespondence, AssignCorrespondence, ProcessCorrespondence, ValidateCorrespondence
         ],
         [ApplicationRoles.TaxManager] =
         [
@@ -53,6 +59,7 @@ public static class ApplicationPermissions
             DeleteTaxDocuments,
             ManageTaxObligations,
             ImportTaxMatrix
+            ,ViewCorrespondence, CreateCorrespondence, AssignCorrespondence, ProcessCorrespondence, ValidateCorrespondence
         ],
         [ApplicationRoles.Preparer] =
         [
@@ -61,6 +68,7 @@ public static class ApplicationPermissions
             PrepareTaxDeclarations,
             UploadTaxDocuments,
             DownloadTaxDocuments
+            ,ViewCorrespondence, CreateCorrespondence, ProcessCorrespondence
         ],
         [ApplicationRoles.Approver] =
         [
@@ -68,6 +76,7 @@ public static class ApplicationPermissions
             ViewTaxDeclarations,
             ApproveTaxDeclarations,
             DownloadTaxDocuments
+            ,ViewCorrespondence, ProcessCorrespondence, ValidateCorrespondence
         ],
         [ApplicationRoles.FinanceManager] =
         [
@@ -76,6 +85,7 @@ public static class ApplicationPermissions
             ManageTaxPayments,
             UploadTaxDocuments,
             DownloadTaxDocuments
+            ,ViewCorrespondence, CreateCorrespondence, ProcessCorrespondence
         ],
         [ApplicationRoles.Auditor] =
         [
@@ -83,12 +93,14 @@ public static class ApplicationPermissions
             ViewTaxDeclarations,
             DownloadTaxDocuments,
             ViewAuditLogs
+            ,ViewCorrespondence
         ],
         [ApplicationRoles.ReadOnly] =
         [
             ViewDashboard,
             ViewTaxDeclarations,
             DownloadTaxDocuments
+            ,ViewCorrespondence
         ]
     };
 

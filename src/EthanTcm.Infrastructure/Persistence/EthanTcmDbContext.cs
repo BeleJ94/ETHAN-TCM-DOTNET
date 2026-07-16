@@ -42,6 +42,11 @@ public sealed class EthanTcmDbContext(DbContextOptions<EthanTcmDbContext> option
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<ImportError> ImportErrors => Set<ImportError>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<Correspondence> Correspondences => Set<Correspondence>();
+    public DbSet<CorrespondenceHistory> CorrespondenceHistory => Set<CorrespondenceHistory>();
+    public DbSet<CorrespondenceDocument> CorrespondenceDocuments => Set<CorrespondenceDocument>();
+    public DbSet<CorrespondenceSequence> CorrespondenceSequences => Set<CorrespondenceSequence>();
+    public DbSet<CorrespondenceOrganization> CorrespondenceOrganizations => Set<CorrespondenceOrganization>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

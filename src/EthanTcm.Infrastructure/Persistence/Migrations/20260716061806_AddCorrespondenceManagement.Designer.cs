@@ -4,6 +4,7 @@ using EthanTcm.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EthanTcm.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EthanTcmDbContext))]
-    partial class EthanTcmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716061125_AddCorrespondenceManagement")]
+    partial class AddCorrespondenceManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -210,10 +213,6 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("BusinessReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<int>("Channel")
                         .HasColumnType("int");
 
@@ -225,9 +224,6 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly>("CorrespondenceDate")
                         .HasColumnType("date");
-
-                    b.Property<Guid?>("CorrespondentOrganizationId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -242,9 +238,6 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly?>("DueDate")
                         .HasColumnType("date");
-
-                    b.Property<Guid?>("InternalDepartmentId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ParentCorrespondenceId")
                         .HasColumnType("uniqueidentifier");
@@ -310,13 +303,7 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BusinessReference");
-
-                    b.HasIndex("CorrespondentOrganizationId");
-
                     b.HasIndex("CreatedAt");
-
-                    b.HasIndex("InternalDepartmentId");
 
                     b.HasIndex("ReferenceNumber")
                         .IsUnique()
@@ -460,69 +447,6 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
                     b.HasIndex("UpdatedByUserId", "UpdatedAt");
 
                     b.ToTable("CorrespondenceHistory", (string)null);
-                });
-
-            modelBuilder.Entity("EthanTcm.Domain.Entities.CorrespondenceOrganization", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("ContactEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("UpdatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("CreatedByUserId", "CreatedAt");
-
-                    b.HasIndex("IsActive", "Name");
-
-                    b.HasIndex("UpdatedByUserId", "UpdatedAt");
-
-                    b.ToTable("CorrespondenceOrganizations", (string)null);
                 });
 
             modelBuilder.Entity("EthanTcm.Domain.Entities.CorrespondenceSequence", b =>
@@ -3036,19 +2960,6 @@ namespace EthanTcm.Infrastructure.Persistence.Migrations
                     b.HasOne("EthanTcm.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("EthanTcm.Domain.Entities.Correspondence", b =>
-                {
-                    b.HasOne("EthanTcm.Domain.Entities.CorrespondenceOrganization", null)
-                        .WithMany()
-                        .HasForeignKey("CorrespondentOrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("EthanTcm.Domain.Entities.Department", null)
-                        .WithMany()
-                        .HasForeignKey("InternalDepartmentId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 

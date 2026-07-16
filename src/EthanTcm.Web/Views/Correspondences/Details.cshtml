@@ -1,0 +1,158 @@
+@model CorrespondenceDetailsViewModel
+@using EthanTcm.Domain.Enums
+@{
+    ViewData["Title"] = Model.Item.Reference ?? "Correspondence draft";
+    var x = Model.Item;
+    var isFinal = x.Status is CorrespondenceStatus.Closed or CorrespondenceStatus.Cancelled or CorrespondenceStatus.FiledWithoutAction;
+    var progress = x.Status switch
+    {
+        CorrespondenceStatus.Draft => 10,
+        CorrespondenceStatus.Registered => 22,
+        CorrespondenceStatus.Assigned => 35,
+        CorrespondenceStatus.InProgress => 50,
+        CorrespondenceStatus.AwaitingResponse or CorrespondenceStatus.SubmittedForValidation => 65,
+        CorrespondenceStatus.Validated or CorrespondenceStatus.Processed => 78,
+        CorrespondenceStatus.ReadyToSend or CorrespondenceStatus.Sent => 88,
+        CorrespondenceStatus.Acknowledged => 95,
+        CorrespondenceStatus.Closed => 100,
+        _ => 50
+    };
+}
+
+@if (TempData["StatusMessage"] is string statusMessage)
+{
+    var statusType = TempData["StatusType"] as string ?? "info";
+    <div class="alert alert-@statusType alert-dismissible fade show shadow-sm" role="alert">
+        <strong>@(statusType == "success" ? "Success." : "Action required.")</strong> @statusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <a asp-action="Index" class="text-decoration-none">← Correspondence control center</a>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <h1 class="h2 mb-0">@(x.Reference ?? "New correspondence")</h1>
+            <span class="badge text-bg-@(x.Direction == CorrespondenceDirection.Incoming ? "primary" : "dark")">@x.Direction</span>
+            <span class="badge rounded-pill text-bg-light border">@x.Status</span>
+        </div>
+        <p class="text-muted mt-2 mb-0">@x.Subject</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary">Back to portfolio</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4 bg-dark text-white">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between mb-2"><span class="fw-semibold">Processing progress</span><span>@progress%</span></div>
+        <div class="progress" role="progressbar" aria-valuenow="@progress" aria-valuemin="0" aria-valuemax="100" style="height:8px"><div class="progress-bar bg-info" style="width:@(progress)%"></div></div>
+        <div class="d-flex justify-content-between small text-white-50 mt-2"><span>Capture</span><span>Register</span><span>Assign</span><span>Process</span><span>Complete</span></div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="card border-primary shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex align-items-center gap-2"><span class="badge text-bg-light text-primary">NEXT</span><strong>Recommended next action</strong></div>
+            <div class="card-body p-4">
+                @if (x.Status == CorrespondenceStatus.Draft)
+                {
+                    <div class="alert alert-warning border-warning"><strong>Action required before continuing.</strong><br/>Confirm the creation so the system can assign the official tracking number.</div>
+                    <h2 class="h4">Confirm creation and continue</h2>
+                    <p class="text-muted">The next screen will ask you to assign the responsible owner and deadline.</p>
+                    <form asp-action="Register" method="post" data-single-submit>
+                        <input type="hidden" name="Id" value="@x.Id" />
+                        <button class="btn btn-primary btn-lg" type="submit">Confirm and continue</button>
+                    </form>
+                }
+                else if (x.Status == CorrespondenceStatus.Registered)
+                {
+                    <h2 class="h4">Assign an owner and deadline</h2>
+                    <p class="text-muted">Select who must handle this correspondence and clarify when the response or processing is due.</p>
+                    <form asp-action="Assign" method="post" class="row g-3" data-single-submit>
+                        <input type="hidden" name="Id" value="@x.Id" />
+                        <div class="col-md-5"><label class="form-label fw-semibold">Responsible owner</label><select name="AssignedToUserId" asp-items="Model.Users" class="form-select" required><option value="">Select an owner</option></select></div>
+                        <div class="col-md-3"><label class="form-label fw-semibold">Due date</label><input name="DueDate" type="date" class="form-control" required /></div>
+                        <div class="col-md-4"><label class="form-label fw-semibold">Instruction</label><input name="Comment" class="form-control" placeholder="Expected outcome" /></div>
+                        <div class="col-12"><button class="btn btn-primary" type="submit">Assign and notify owner</button></div>
+                    </form>
+                }
+                else if (x.Status == CorrespondenceStatus.Assigned)
+                {
+                    <h2 class="h4">Start processing</h2><p class="text-muted">Confirm that the assigned owner has taken responsibility for this item.</p>
+                    <form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="InProgress" /><button class="btn btn-primary" type="submit">Start processing</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.InProgress && x.Direction == CorrespondenceDirection.Incoming)
+                {
+                    <h2 class="h4">Record the processing outcome</h2><p class="text-muted">Indicate whether a response is still expected or the incoming correspondence has been fully processed.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="AwaitingResponse" /><button class="btn btn-outline-primary">Awaiting response</button></form>
+                        <form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Processed" /><button class="btn btn-primary">Mark as processed</button></form>
+                    </div>
+                }
+                else if (x.Status == CorrespondenceStatus.InProgress && x.Direction == CorrespondenceDirection.Outgoing)
+                {
+                    <h2 class="h4">Submit the outgoing correspondence for validation</h2><p class="text-muted">Attach the prepared document, then send it to the validator.</p>
+                    <form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="SubmittedForValidation" /><textarea name="Comment" class="form-control mb-3" placeholder="Note to validator"></textarea><button class="btn btn-primary">Submit for validation</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.AwaitingResponse)
+                {
+                    <h2 class="h4">Update the response status</h2><p class="text-muted">Resume processing when the expected response arrives.</p>
+                    <form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="InProgress" /><button class="btn btn-primary">Response received — resume</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.SubmittedForValidation)
+                {
+                    <h2 class="h4">Validate or return for correction</h2><p class="text-muted">Review the outgoing correspondence before authorising dispatch.</p>
+                    <div class="d-flex flex-wrap gap-2"><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Validated" /><button class="btn btn-success">Validate</button></form><form asp-action="Advance" method="post" class="d-flex gap-2" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Rejected" /><input name="Comment" class="form-control" placeholder="Correction required" required /><button class="btn btn-outline-danger">Reject</button></form></div>
+                }
+                else if (x.Status == CorrespondenceStatus.Rejected)
+                {
+                    <h2 class="h4">Apply the requested corrections</h2><p class="text-muted">Return the correspondence to processing and prepare a revised version.</p><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="InProgress" /><button class="btn btn-primary">Resume correction</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.Validated)
+                {
+                    <h2 class="h4">Prepare dispatch</h2><p class="text-muted">Attach the signed version and confirm that the correspondence is ready to send.</p><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="ReadyToSend" /><button class="btn btn-primary">Mark ready to send</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.ReadyToSend)
+                {
+                    <h2 class="h4">Confirm dispatch</h2><p class="text-muted">Record that the correspondence has left the organisation. Add dispatch proof in the documents panel.</p><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Sent" /><button class="btn btn-primary">Confirm sent</button></form>
+                }
+                else if (x.Status == CorrespondenceStatus.Sent)
+                {
+                    <h2 class="h4">Track delivery</h2><p class="text-muted">Record the acknowledgement when available, or close the item if no acknowledgement is required.</p><div class="d-flex gap-2"><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Acknowledged" /><button class="btn btn-primary">Acknowledgement received</button></form><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Closed" /><button class="btn btn-outline-secondary">Close without acknowledgement</button></form></div>
+                }
+                else if (x.Status is CorrespondenceStatus.Processed or CorrespondenceStatus.Acknowledged)
+                {
+                    <h2 class="h4">Close the correspondence</h2><p class="text-muted">The operational work is complete. Close the record to remove it from the active portfolio.</p><form asp-action="Advance" method="post" data-single-submit><input type="hidden" name="Id" value="@x.Id" /><input type="hidden" name="Target" value="Closed" /><button class="btn btn-success">Close correspondence</button></form>
+                }
+                else if (isFinal)
+                {
+                    <h2 class="h4 text-success">Processing complete</h2><p class="text-muted mb-0">No further action is required. The full audit trail remains available below.</p>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white fw-semibold">Correspondence brief</div><div class="card-body"><div class="row g-3"><div class="col-md-6"><span class="text-muted small">Business reference</span><div class="fw-semibold">@(x.BusinessReference ?? "—")</div></div><div class="col-md-6"><span class="text-muted small">Internal department</span><div class="fw-semibold">@(x.InternalDepartment ?? "—")</div></div><div class="col-md-6"><span class="text-muted small">From</span><div>@(x.SenderOrganization ?? x.SenderName ?? "—")</div></div><div class="col-md-6"><span class="text-muted small">To</span><div>@(x.RecipientOrganization ?? x.RecipientName ?? "—")</div></div><div class="col-md-4"><span class="text-muted small">Priority</span><div>@x.Priority</div></div><div class="col-md-4"><span class="text-muted small">Channel</span><div>@x.Channel</div></div><div class="col-md-4"><span class="text-muted small">Due date</span><div>@(x.DueDate?.ToString("dd MMM yyyy") ?? "Not set")</div></div>@if(!string.IsNullOrWhiteSpace(x.Summary)){<div class="col-12 border-top pt-3">@x.Summary</div>}</div></div></div>
+
+        <div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold">Audit trail</div><div class="card-body">@if(x.History.Count==0){<p class="text-muted mb-0">The workflow has not started.</p>}@foreach(var h in x.History){<div class="d-flex gap-3 pb-3 mb-3 border-bottom"><div class="rounded-circle bg-primary" style="width:10px;height:10px;margin-top:7px"></div><div><div class="fw-semibold">@h.Action</div><div class="small text-muted">@h.Actor · @h.At.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>@if(!string.IsNullOrWhiteSpace(h.Comment)){<div class="mt-1">@h.Comment</div>}</div></div>}</div></div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white fw-semibold">Current responsibility</div><div class="card-body"><div class="small text-muted">Owner</div><div class="fw-semibold mb-3">@(x.AssignedTo ?? "Not assigned yet")</div><div class="small text-muted">Deadline</div><div class="fw-semibold">@(x.DueDate?.ToString("dd MMM yyyy") ?? "Not defined")</div>@if(x.Status is not CorrespondenceStatus.Draft and not CorrespondenceStatus.Registered && !isFinal){<hr/><details><summary class="text-primary">Reassign or change deadline</summary><form asp-action="Assign" method="post" class="mt-3" data-single-submit><input type="hidden" name="Id" value="@x.Id"/><select name="AssignedToUserId" asp-items="Model.Users" class="form-select mb-2" required><option value="">Select owner</option></select><input name="DueDate" type="date" value="@x.DueDate?.ToString("yyyy-MM-dd")" class="form-control mb-2" required/><input name="Comment" class="form-control mb-2" placeholder="Reason for reassignment"/><button class="btn btn-outline-primary w-100">Update responsibility</button></form></details>}</div></div>
+
+        <div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold">Supporting documents</div><div class="card-body">@if(x.Documents.Count==0){<p class="small text-muted">No document attached yet.</p>}@foreach(var d in x.Documents){<div class="d-flex justify-content-between border-bottom py-2"><div class="overflow-hidden"><div class="small fw-semibold text-truncate">@d.FileName</div><div class="small text-muted">@d.Type · @(d.Size/1024) KB</div></div><a asp-action="Download" asp-route-id="@d.Id" class="btn btn-sm btn-light">Download</a></div>}@if(!isFinal){<form asp-action="Upload" method="post" enctype="multipart/form-data" class="mt-3" data-single-submit><input type="hidden" name="Id" value="@x.Id"/><label class="form-label small fw-semibold">Document type</label><select name="DocumentType" class="form-select form-select-sm mb-2" asp-items="Html.GetEnumSelectList<CorrespondenceDocumentType>()"></select><input name="Upload" type="file" class="form-control form-control-sm mb-2" required/><button class="btn btn-sm btn-outline-primary w-100">Attach document</button></form>}</div></div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.querySelectorAll('form[data-single-submit]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+        form.querySelectorAll('button[type="submit"], button:not([type])').forEach(function (button) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            button.textContent = 'Processing…';
+        });
+    });
+});
+</script>
+}

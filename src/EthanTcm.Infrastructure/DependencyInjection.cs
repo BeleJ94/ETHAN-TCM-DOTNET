@@ -52,6 +52,8 @@ public static class DependencyInjection
         services.TryAddScoped<IDeadlineReminderService, DeadlineReminderService>();
         services.TryAddScoped<IInitialTaxObligationSeeder, InitialTaxObligationSeeder>();
         services.TryAddScoped<ITaxCatalogSynchronizationService, TaxCatalogSynchronizationService>();
+        services.TryAddScoped<ICorrespondenceService, CorrespondenceService>();
+        services.TryAddScoped<ICorrespondenceOrganizationService, CorrespondenceOrganizationService>();
 
         return services;
     }

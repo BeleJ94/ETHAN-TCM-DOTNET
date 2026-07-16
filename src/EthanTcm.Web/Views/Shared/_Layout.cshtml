@@ -15,6 +15,7 @@
     var canImportTaxMatrix = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ImportTaxMatrix)).Succeeded;
     var canViewAuditLogs = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ViewAuditLogs)).Succeeded;
     var canRunAdministrationTasks = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.RunAdministrationTasks)).Succeeded;
+    var canViewCorrespondence = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ViewCorrespondence)).Succeeded;
     var hasDeclarationsMenu = canViewTaxDeclarations;
     var hasPaymentsMenu = canManagePayments;
     var hasReferentialMenu = canManageTaxObligations || canImportTaxMatrix;
@@ -22,6 +23,7 @@
     var hasAdministrationMenu = canRunAdministrationTasks;
     var isDeclarationsActive = activeController == "TaxDeclarations";
     var isPaymentsActive = activeController == "Payments";
+    var isCorrespondenceActive = activeController == "Correspondences";
     var isReferentialActive = activeController is "TaxObligations" or "TaxMatrixImport";
     var isMonitoringActive = activeController == "AuditLogs" || (activeController == "Home" && activeDashboardView is nameof(DashboardView.LateItems) or nameof(DashboardView.ComplianceOverview));
     var isAdministrationActive = activeController == "AdminSeed";
@@ -207,6 +209,23 @@
                                             Missing payment proof
                                         </a>
                                     </li>
+                                </ul>
+                            </li>
+                        }
+                        @if (canViewCorrespondence)
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(isCorrespondenceActive ? "active" : string.Empty)" href="#" id="correspondenceMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <svg class="icon"><use href="#icon-file"></use></svg>
+                                    Correspondence
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="correspondenceMenu">
+                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Index">Control center</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Index" asp-route-myItems="true">My portfolio</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Incoming">Register incoming</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Outgoing">Prepare outgoing</a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" asp-controller="CorrespondenceOrganizations" asp-action="Index">Correspondent organisations</a></li>
                                 </ul>
                             </li>
                         }
