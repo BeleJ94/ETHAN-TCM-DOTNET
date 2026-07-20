@@ -113,6 +113,33 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
     }
 }
 
+public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
+{
+    public void Configure(EntityTypeBuilder<Permission> builder)
+    {
+        builder.ToTable("Permissions");
+        builder.HasKey(permission => permission.Id);
+        builder.Property(permission => permission.Code).HasMaxLength(150).IsRequired();
+        builder.Property(permission => permission.Name).HasMaxLength(150).IsRequired();
+        builder.Property(permission => permission.Domain).HasMaxLength(80).IsRequired();
+        builder.Property(permission => permission.Description).HasMaxLength(1000);
+        builder.HasIndex(permission => permission.Code).IsUnique();
+        builder.HasIndex(permission => new { permission.Domain, permission.IsActive });
+    }
+}
+
+public sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
+{
+    public void Configure(EntityTypeBuilder<RolePermission> builder)
+    {
+        builder.ToTable("RolePermissions");
+        builder.HasKey(item => item.Id);
+        builder.HasOne<Role>().WithMany().HasForeignKey(item => item.RoleId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Permission>().WithMany().HasForeignKey(item => item.PermissionId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(item => new { item.RoleId, item.PermissionId }).IsUnique();
+    }
+}
+
 public sealed class DepartmentConfiguration : IEntityTypeConfiguration<Department>
 {
     public void Configure(EntityTypeBuilder<Department> builder)

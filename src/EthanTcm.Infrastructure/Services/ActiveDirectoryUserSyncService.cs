@@ -10,6 +10,7 @@ namespace EthanTcm.Infrastructure.Services;
 
 public sealed class ActiveDirectoryUserSyncService(
     EthanTcmDbContext dbContext,
+    IAccessAdministrationService accessAdministrationService,
     IOptions<EthanTcmAuthenticationOptions> authenticationOptions)
     : IActiveDirectoryUserSyncService
 {
@@ -43,13 +44,7 @@ public sealed class ActiveDirectoryUserSyncService(
             ?? FindClaimValue(principal, ClaimTypes.NameIdentifier);
         var now = DateTimeOffset.UtcNow;
 
-        var normalizedRoles = NormalizeRoles(applicationRoles);
-        if (normalizedRoles.Count == 0)
-        {
-            normalizedRoles.Add(authenticationOptions.Value.ActiveDirectory.DefaultRole);
-        }
-
-        var roleEntities = await EnsureRolesAsync(normalizedRoles, now, cancellationToken);
+        await accessAdministrationService.EnsureCatalogAsync(cancellationToken);
 
         var user = await dbContext.Users
             .Include(current => current.Roles)
@@ -68,30 +63,40 @@ public sealed class ActiveDirectoryUserSyncService(
             userWasCreated = true;
         }
 
-        var requiredRoleIds = roleEntities.Select(role => role.Id).Distinct().ToArray();
-        var currentRoleIds = user.Roles.Select(role => role.RoleId).Distinct().ToArray();
         var profileChanged = user.DisplayName != displayName ||
             user.Email != email ||
             user.ExternalId != externalId ||
-            user.DepartmentId is not null ||
-            !user.IsActive;
-        var rolesChanged = currentRoleIds.Length != requiredRoleIds.Length ||
-            currentRoleIds.Any(roleId => !requiredRoleIds.Contains(roleId));
+            user.DepartmentId is not null;
 
         if (userWasCreated || profileChanged)
         {
-            user.UpdateProfile(displayName, email, externalId, departmentId: null, now);
+            user.SynchronizeIdentity(displayName, email, externalId, now);
         }
 
-        if (userWasCreated || rolesChanged)
+        if (userWasCreated)
         {
-            user.SynchronizeRoles(requiredRoleIds, now);
+            var initialRoles = NormalizeRoles(applicationRoles);
+            if (initialRoles.Count == 0) initialRoles.Add(authenticationOptions.Value.ActiveDirectory.DefaultRole);
+            var initialRoleIds = await dbContext.Roles.Where(role => initialRoles.Contains(role.Code)).Select(role => role.Id).ToListAsync(cancellationToken);
+            user.ReplaceRoles(initialRoleIds, now);
         }
 
-        if (userWasCreated || profileChanged || rolesChanged)
+        if (userWasCreated || profileChanged)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+
+        if (!user.IsActive) return null;
+
+        var roleEntities = await (from userRole in dbContext.UserRoles
+                                  join role in dbContext.Roles on userRole.RoleId equals role.Id
+                                  where userRole.UserId == user.Id && role.IsActive
+                                  select role).ToListAsync(cancellationToken);
+        var permissionCodes = await (from userRole in dbContext.UserRoles
+                                     join rolePermission in dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+                                     join permission in dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+                                     where userRole.UserId == user.Id && permission.IsActive
+                                     select permission.Code).Distinct().ToListAsync(cancellationToken);
 
         var identity = new System.Security.Claims.ClaimsIdentity("EthanTcmUserSync");
         identity.AddClaim(new System.Security.Claims.Claim(EthanTcmClaimTypes.UserId, user.Id.ToString()));
@@ -104,28 +109,12 @@ public sealed class ActiveDirectoryUserSyncService(
         {
             identity.AddClaim(new System.Security.Claims.Claim(ClaimTypes.Role, role.Code));
         }
-
-        return identity;
-    }
-
-    private async Task<List<Role>> EnsureRolesAsync(
-        IReadOnlyCollection<string> roleCodes,
-        DateTimeOffset timestamp,
-        CancellationToken cancellationToken)
-    {
-        var existingRoles = await dbContext.Roles
-            .Where(role => roleCodes.Contains(role.Code))
-            .ToListAsync(cancellationToken);
-
-        foreach (var roleCode in roleCodes.Where(roleCode => existingRoles.All(role => role.Code != roleCode)))
+        foreach (var permission in permissionCodes)
         {
-            var role = new Role(roleCode, ToDisplayName(roleCode), "Application role synchronized from authentication.");
-            role.MarkCreatedBy(Guid.Empty);
-            dbContext.Roles.Add(role);
-            existingRoles.Add(role);
+            identity.AddClaim(new System.Security.Claims.Claim(EthanTcmClaimTypes.Permission, permission));
         }
 
-        return existingRoles;
+        return identity;
     }
 
     private static HashSet<string> NormalizeRoles(IEnumerable<string> roles)
@@ -156,14 +145,4 @@ public sealed class ActiveDirectoryUserSyncService(
         return login.Trim();
     }
 
-    private static string ToDisplayName(string roleCode)
-    {
-        return roleCode switch
-        {
-            ApplicationRoles.TaxManager => "Tax Manager",
-            ApplicationRoles.FinanceManager => "Finance Manager",
-            ApplicationRoles.ReadOnly => "Read Only",
-            _ => roleCode
-        };
-    }
 }

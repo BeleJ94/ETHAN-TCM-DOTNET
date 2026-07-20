@@ -20,7 +20,9 @@ public sealed class ApplicationClaimsTransformation(
             return principal;
         }
 
-        var applicationRoles = ResolveApplicationRoles(principal);
+        var applicationRoles = authenticationOptions.Value.Mode == AuthMode.LocalAuth
+            ? ResolveApplicationRoles(principal)
+            : Array.Empty<string>();
         var synchronizedIdentity = await userSyncService.SynchronizeAsync(principal, applicationRoles);
 
         if (synchronizedIdentity is not null)

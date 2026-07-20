@@ -47,6 +47,24 @@ public sealed class User : AuditableEntity
         MarkUpdated(syncedAt);
     }
 
+    public void SynchronizeIdentity(string displayName, string email, string? externalId, DateTimeOffset syncedAt)
+    {
+        DisplayName = EntityGuards.Required(displayName, nameof(displayName));
+        Email = EntityGuards.Required(email, nameof(email));
+        ExternalId = externalId;
+        LastSyncedAt = syncedAt;
+        MarkUpdated(syncedAt);
+    }
+
+    public void Activate(DateTimeOffset timestamp)
+    {
+        IsActive = true;
+        MarkUpdated(timestamp);
+    }
+
+    public void ReplaceRoles(IEnumerable<Guid> roleIds, DateTimeOffset timestamp)
+        => SynchronizeRoles(roleIds, timestamp);
+
     public void AssignRole(Guid roleId, DateTimeOffset assignedAt)
     {
         EntityGuards.Required(roleId, nameof(roleId));

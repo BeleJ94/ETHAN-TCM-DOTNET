@@ -121,6 +121,164 @@ a:hover {
   background: #3f4b5b;
 }
 
+.access-denied-shell {
+    min-height: calc(100vh - 10rem);
+    display: grid;
+    place-items: center;
+    padding: 2.5rem 1rem;
+}
+
+.access-denied-card {
+    width: min(100%, 920px);
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid #e4e9f1;
+    border-radius: 1.25rem;
+    background: #fff;
+    box-shadow: 0 1.5rem 3.5rem rgba(25, 42, 70, .12);
+}
+
+.access-denied-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    padding: 3rem 2rem;
+    color: #fff;
+    background: linear-gradient(145deg, #163b65, #245f95);
+}
+
+.access-denied-icon {
+    display: grid;
+    width: 6rem;
+    height: 6rem;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .32);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .12);
+}
+
+.access-denied-icon .icon {
+    width: 3rem;
+    height: 3rem;
+}
+
+.access-denied-code {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+}
+
+.access-denied-content {
+    padding: 3rem;
+}
+
+.access-denied-content h1 {
+    margin-bottom: .75rem;
+    font-size: clamp(2rem, 4vw, 2.75rem);
+}
+
+.access-denied-lead {
+    max-width: 62ch;
+    margin-bottom: 1.5rem;
+    color: #58677a;
+    font-size: 1.05rem;
+}
+
+.access-denied-resource,
+.access-denied-context {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #e4e9f1;
+    border-radius: .75rem;
+    background: #f8fafc;
+}
+
+.access-denied-resource span,
+.access-denied-context span {
+    display: block;
+    margin-bottom: .2rem;
+    color: #6c7888;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.access-denied-context {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.access-denied-context strong {
+    overflow-wrap: anywhere;
+}
+
+.access-denied-guidance {
+    display: flex;
+    gap: .75rem;
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border-left: 4px solid #d69e2e;
+    border-radius: .5rem;
+    background: #fff8e7;
+    color: #624a13;
+}
+
+.access-denied-guidance .icon {
+    flex: 0 0 auto;
+    margin-top: .15rem;
+}
+
+.access-denied-guidance p,
+.access-denied-reference {
+    margin: 0;
+}
+
+.access-denied-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+
+.access-denied-reference {
+    margin-top: 1.5rem;
+    color: #788596;
+    font-size: .8rem;
+}
+
+@media (max-width: 767.98px) {
+    .access-denied-card {
+        grid-template-columns: 1fr;
+    }
+
+    .access-denied-visual {
+        flex-direction: row;
+        padding: 1.5rem;
+    }
+
+    .access-denied-icon {
+        width: 4rem;
+        height: 4rem;
+    }
+
+    .access-denied-icon .icon {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    .access-denied-content {
+        padding: 2rem 1.5rem;
+    }
+
+    .access-denied-context {
+        grid-template-columns: 1fr;
+    }
+}
+
 .btn-outline-success {
   border-color: var(--accent);
   color: var(--accent);
@@ -244,6 +402,20 @@ a:hover {
 .app-top-nav .dropdown-item.active {
   background: #e8eef5;
   color: var(--brand-strong);
+}
+
+.app-top-nav .dropdown-header {
+  padding: .45rem .6rem .2rem;
+  color: #7a8796;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.app-top-nav .dropdown-divider {
+  margin: .3rem .45rem;
+  border-color: #dce3eb;
 }
 
 .app-userbar {

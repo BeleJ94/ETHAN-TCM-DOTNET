@@ -83,6 +83,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
+        .RequireClaim(EthanTcmClaimTypes.UserId)
         .Build();
 
     foreach (var role in ApplicationRoles.All)
@@ -92,7 +93,7 @@ builder.Services.AddAuthorization(options =>
 
     foreach (var permission in ApplicationPermissions.All)
     {
-        options.AddPolicy(permission, policy => policy.RequireRole(ApplicationPermissions.RolesFor(permission)));
+        options.AddPolicy(permission, policy => policy.RequireClaim(EthanTcmClaimTypes.Permission, permission));
     }
 });
 
@@ -102,6 +103,16 @@ builder.Services.AddControllersWithViews(options =>
 });
 
 var app = builder.Build();
+
+if (args.Length > 1 && args[0].Equals("bootstrap-administrator", StringComparison.OrdinalIgnoreCase))
+{
+    using var scope = app.Services.CreateScope();
+    var accessAdministration = scope.ServiceProvider.GetRequiredService<IAccessAdministrationService>();
+    var result = await accessAdministration.BootstrapAdministratorAsync(args[1]);
+    Console.WriteLine(result.Message);
+    Environment.ExitCode = result.Success ? 0 : 1;
+    return;
+}
 
 if (args.Length > 0 && args[0].Equals("sync-tax-catalog", StringComparison.OrdinalIgnoreCase))
 {
@@ -141,6 +152,10 @@ else
 {
     app.UseDeveloperExceptionPage();
 }
+
+app.UseStatusCodePagesWithReExecute(
+    "/Account/AccessDenied",
+    "?statusCode={0}");
 
 app.UseResponseCompression();
 app.UseHttpsRedirection();

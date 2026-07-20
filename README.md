@@ -87,6 +87,18 @@ dotnet tool install --global dotnet-ef
 
 - Developpement : utilisateur local simule par `DevelopmentCurrentUser`.
 - Production : Windows Authentication / Active Directory via IIS.
+- Active Directory fournit uniquement l'identite (login, nom, email). Les roles
+  et permissions fonctionnels sont administres dans ETHAN TCM via
+  `Administration > Access management`.
+
+Pour initialiser le premier administrateur applicatif sur une nouvelle base :
+
+```powershell
+dotnet run --project src\EthanTcm.Web\EthanTcm.Web.csproj -- bootstrap-administrator "DOMAIN\login"
+```
+
+La commande doit etre executee de maniere controlee. L'application empeche
+ensuite la desactivation ou la retrogradation du dernier administrateur actif.
 
 Pour IIS :
 

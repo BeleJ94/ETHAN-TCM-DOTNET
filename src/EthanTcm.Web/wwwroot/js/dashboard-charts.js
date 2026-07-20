@@ -219,7 +219,7 @@
       data: {
         labels: labels(points),
         datasets: [{
-          label: "Dossiers ouverts",
+          label: "Open items",
           data: values(points),
           segmentKeys: keys(points),
           backgroundColor: softColors(points),

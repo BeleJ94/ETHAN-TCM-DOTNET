@@ -303,6 +303,14 @@
 
   const buildConfirmationItems = (form) => {
     const items = [];
+    const correspondenceTitle = document.querySelector("main h1")?.textContent.trim();
+    const correspondenceSubject = document.querySelector("main h1")?.closest("div")?.querySelector("p")?.textContent.trim();
+    if (correspondenceTitle && form.action.includes("Correspondence")) {
+      items.push({ label: "Correspondence", value: correspondenceTitle });
+    }
+    if (correspondenceSubject && form.action.includes("Correspondence")) {
+      items.push({ label: "Subject", value: correspondenceSubject });
+    }
     const declarationTitle = document.querySelector(".declaration-heading h1")?.textContent.trim();
     const declarationPeriod = document.querySelector(".declaration-heading p")?.textContent.trim();
     if (declarationTitle) {
@@ -374,6 +382,11 @@
   const renderConfirmation = (form) => {
     const modal = ensureConfirmationModal();
     modal.querySelector(".modal-title").textContent = form.dataset.confirmTitle || "Confirm action";
+    modal.querySelector(".modal-body > p").textContent = form.dataset.confirmMessage || "Review the information before submitting.";
+    const confirmButton = modal.querySelector(".js-confirm-submit");
+    const submitLabel = form.querySelector("button[type='submit'], button:not([type])")?.textContent.trim().toLowerCase() || "";
+    const isDanger = form.dataset.confirmLevel === "danger" || /(reject|close|cancel|delete)/.test(submitLabel);
+    confirmButton.className = `btn js-confirm-submit ${isDanger ? "btn-danger" : "btn-primary"}`;
     const summary = modal.querySelector(".confirmation-summary");
     summary.replaceChildren();
 
@@ -494,8 +507,12 @@
       }
 
       const payload = await response.json();
-      if (payload.success && payload.refreshUrl) {
-        await refreshDeclarationDetails(payload.refreshUrl);
+      if (payload.success && payload.redirectUrl) {
+        showActionAlert(payload.message || "The action was completed successfully.", true);
+        window.setTimeout(() => window.location.assign(payload.redirectUrl), 450);
+      } else if (payload.success && payload.refreshUrl) {
+        window.location.assign(payload.refreshUrl);
+      } else if (payload.success) {
         showActionAlert(payload.message || "The action was completed successfully.", true);
       } else {
         showActionAlert(payload.message || "The action could not be completed.", false);
@@ -510,7 +527,11 @@
   };
 
   document.addEventListener("submit", (event) => {
-    const form = event.target.closest(".js-confirm-ajax-form");
+    const submittedForm = event.target.closest("form");
+    const actionPath = submittedForm ? new URL(submittedForm.action, window.location.href).pathname : "";
+    const isCorrespondencePost = submittedForm && (submittedForm.method || "get").toLowerCase() === "post" &&
+      (actionPath.startsWith("/Correspondences/") || actionPath.startsWith("/CorrespondenceActions/") || actionPath.startsWith("/CorrespondenceOrganizations/"));
+    const form = submittedForm?.classList.contains("js-confirm-ajax-form") || isCorrespondencePost ? submittedForm : null;
     if (!form) {
       return;
     }
@@ -577,15 +598,15 @@
     modalBody.innerHTML = `
       <div class="kpi-modal-loading">
         <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-        <span>Chargement du détail…</span>
+        <span>Loading details…</span>
       </div>`;
   };
 
   const renderError = () => {
     modalBody.innerHTML = `
       <div class="kpi-modal-error" role="alert">
-        <strong>Le détail n’a pas pu être chargé.</strong>
-        <span>Fermez cette fenêtre puis réessayez.</span>
+        <strong>The details could not be loaded.</strong>
+        <span>Close this window and try again.</span>
       </div>`;
   };
 
@@ -605,7 +626,7 @@
 
       modalBody.innerHTML = await response.text();
       const detailTitle = modalBody.querySelector(".kpi-detail-header h2");
-      modalTitle.textContent = detailTitle?.textContent?.trim() || "Détail du KPI";
+      modalTitle.textContent = detailTitle?.textContent?.trim() || "KPI details";
     } catch (error) {
       if (error.name !== "AbortError") {
         renderError();
@@ -617,7 +638,7 @@
     const card = event.target.closest(".js-kpi-card");
     if (card && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) {
       event.preventDefault();
-      modalTitle.textContent = "Détail du KPI";
+      modalTitle.textContent = "KPI details";
       modal.show();
       loadDetails(card.dataset.kpiUrl);
       return;
@@ -636,7 +657,7 @@
       return;
     }
 
-    modalTitle.textContent = event.detail?.title || "Detail du graphique";
+    modalTitle.textContent = event.detail?.title || "Chart details";
     modal.show();
     loadDetails(url);
   });

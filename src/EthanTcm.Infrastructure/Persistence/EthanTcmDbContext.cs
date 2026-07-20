@@ -10,6 +10,8 @@ public sealed class EthanTcmDbContext(DbContextOptions<EthanTcmDbContext> option
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<TaxType> TaxTypes => Set<TaxType>();
@@ -47,6 +49,8 @@ public sealed class EthanTcmDbContext(DbContextOptions<EthanTcmDbContext> option
     public DbSet<CorrespondenceDocument> CorrespondenceDocuments => Set<CorrespondenceDocument>();
     public DbSet<CorrespondenceSequence> CorrespondenceSequences => Set<CorrespondenceSequence>();
     public DbSet<CorrespondenceOrganization> CorrespondenceOrganizations => Set<CorrespondenceOrganization>();
+    public DbSet<CorrespondenceFollowUpAction> CorrespondenceFollowUpActions => Set<CorrespondenceFollowUpAction>();
+    public DbSet<CorrespondenceActionNotification> CorrespondenceActionNotifications => Set<CorrespondenceActionNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

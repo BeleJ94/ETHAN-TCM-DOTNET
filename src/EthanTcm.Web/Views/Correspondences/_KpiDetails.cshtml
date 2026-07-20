@@ -1,0 +1,51 @@
+@model CorrespondenceMetricDetails
+@using EthanTcm.Application.Abstractions
+
+<div class="kpi-detail-header">
+    <div>
+        <span class="eyebrow">Indicator composition</span>
+        <h2 class="h5 mb-1">@Model.Title</h2>
+        <p>@Model.Definition</p>
+    </div>
+    <div class="kpi-detail-actions">
+        <div class="kpi-detail-total"><strong>@Model.TotalCount</strong><span>record(s)</span></div>
+        <div class="kpi-export-actions" aria-label="Export correspondence details">
+            <a class="btn btn-sm btn-outline-primary" asp-action="ExportKpiDetails" asp-route-metric="@Model.Metric" asp-route-format="@DashboardExportFormat.Excel"><svg class="icon"><use href="#icon-download"></use></svg>Excel</a>
+            <a class="btn btn-sm btn-outline-primary" asp-action="ExportKpiDetails" asp-route-metric="@Model.Metric" asp-route-format="@DashboardExportFormat.Pdf"><svg class="icon"><use href="#icon-download"></use></svg>PDF</a>
+        </div>
+    </div>
+</div>
+@if (Model.Items.Count == 0)
+{
+    <div class="kpi-detail-empty"><svg class="icon icon-lg"><use href="#icon-check"></use></svg><strong>No item requires attention</strong><span>The current scope contains no record for this indicator.</span></div>
+}
+else
+{
+    <div class="table-responsive kpi-detail-table">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Reference</th><th>Direction</th><th>Subject / counterparty</th><th>Due date</th><th>Status</th><th>Owner</th><th>Executive attention</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><strong>@item.Reference</strong><small class="d-block text-muted">@item.CorrespondenceDate.ToString("dd MMM yyyy")</small></td>
+                    <td><span class="d-inline-flex align-items-center gap-1"><svg class="icon" aria-hidden="true"><use href="@(item.Direction == EthanTcm.Domain.Enums.CorrespondenceDirection.Incoming ? "#icon-inbox" : "#icon-send")"></use></svg>@item.Direction</span></td>
+                    <td><strong>@item.Subject</strong><small class="d-block text-muted">@item.Counterparty</small></td>
+                    <td>@(item.DueDate?.ToString("dd MMM yyyy") ?? "-") @if(item.DaysLate>0){<small class="d-block text-danger">@item.DaysLate day(s) late</small>}</td>
+                    <td><span class="badge rounded-pill text-bg-light border">@item.Status</span></td>
+                    <td>@(item.AssignedTo ?? "Unassigned")<small class="d-block text-muted">@(item.Department ?? "-")</small></td>
+                    <td><span class="status-pill @(item.DaysLate > 0 ? "status-danger" : item.Priority == EthanTcm.Domain.Enums.CorrespondencePriority.Critical ? "status-warning" : "status-active")">@item.Issue</span></td>
+                    <td class="text-end"><a class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" asp-action="Details" asp-route-id="@item.Id"><svg class="icon" aria-hidden="true"><use href="#icon-open"></use></svg>Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+<div class="kpi-detail-footer">
+    <span>Page @Model.Page of @Model.TotalPages</span>
+    <div class="data-table-pagination">
+        <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page <= 1 ? "disabled" : null)" asp-action="KpiDetails" asp-route-metric="@Model.Metric" asp-route-page="@(Model.Page-1)" asp-route-pageSize="@Model.PageSize">Previous</a>
+        <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page >= Model.TotalPages ? "disabled" : null)" asp-action="KpiDetails" asp-route-metric="@Model.Metric" asp-route-page="@(Model.Page+1)" asp-route-pageSize="@Model.PageSize">Next</a>
+    </div>
+</div>

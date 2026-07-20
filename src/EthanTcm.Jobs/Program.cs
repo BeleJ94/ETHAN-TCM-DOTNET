@@ -25,6 +25,13 @@ builder.Services.AddQuartz(options =>
         .ForJob(jobKey)
         .WithIdentity($"{nameof(DeadlineReminderJob)}Trigger")
         .WithCronSchedule(cron));
+
+    var correspondenceJobKey = new JobKey(nameof(CorrespondenceActionReminderJob));
+    options.AddJob<CorrespondenceActionReminderJob>(correspondenceJobKey);
+    options.AddTrigger(trigger => trigger
+        .ForJob(correspondenceJobKey)
+        .WithIdentity($"{nameof(CorrespondenceActionReminderJob)}Trigger")
+        .WithCronSchedule(cron));
 });
 builder.Services.AddQuartzHostedService(options =>
 {

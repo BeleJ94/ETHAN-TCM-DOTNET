@@ -17,6 +17,10 @@ public static class ApplicationPermissions
     public const string ImportTaxMatrix = "Permissions.TaxMatrix.Import";
     public const string ViewAuditLogs = "Permissions.AuditLogs.View";
     public const string RunAdministrationTasks = "Permissions.Administration.Run";
+    public const string ViewUserAdministration = "Permissions.UserAdministration.View";
+    public const string ManageUsers = "Permissions.UserAdministration.ManageUsers";
+    public const string ManageRoles = "Permissions.UserAdministration.ManageRoles";
+    public const string ViewAccessAudit = "Permissions.UserAdministration.ViewAccessAudit";
     public const string ViewCorrespondence = "Permissions.Correspondence.View";
     public const string CreateCorrespondence = "Permissions.Correspondence.Create";
     public const string AssignCorrespondence = "Permissions.Correspondence.Assign";
@@ -42,6 +46,7 @@ public static class ApplicationPermissions
             ImportTaxMatrix,
             ViewAuditLogs,
             RunAdministrationTasks
+            ,ViewUserAdministration, ManageUsers, ManageRoles, ViewAccessAudit
             ,ViewCorrespondence, CreateCorrespondence, AssignCorrespondence, ProcessCorrespondence, ValidateCorrespondence
         ],
         [ApplicationRoles.TaxManager] =

@@ -39,6 +39,7 @@ public static class DependencyInjection
 
         services.TryAddScoped<ICurrentUser, SystemCurrentUser>();
         services.TryAddScoped<IActiveDirectoryUserSyncService, ActiveDirectoryUserSyncService>();
+        services.TryAddScoped<IAccessAdministrationService, AccessAdministrationService>();
         services.TryAddScoped<ITaxMatrixImportService, TaxMatrixImportService>();
         services.TryAddScoped<ITaxMatrixImporter, TaxMatrixImportService>();
         services.TryAddScoped<ITaxObligationReferentialService, TaxObligationReferentialService>();
@@ -54,6 +55,8 @@ public static class DependencyInjection
         services.TryAddScoped<ITaxCatalogSynchronizationService, TaxCatalogSynchronizationService>();
         services.TryAddScoped<ICorrespondenceService, CorrespondenceService>();
         services.TryAddScoped<ICorrespondenceOrganizationService, CorrespondenceOrganizationService>();
+        services.TryAddScoped<ICorrespondenceActionService, CorrespondenceActionService>();
+        services.TryAddScoped<ICorrespondenceActionReminderService, CorrespondenceActionReminderService>();
 
         return services;
     }

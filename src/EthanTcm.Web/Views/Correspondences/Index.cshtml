@@ -1,17 +1,82 @@
 @model CorrespondenceIndexViewModel
+@using EthanTcm.Application.Abstractions
+@using EthanTcm.Domain.Enums
 @{ ViewData["Title"] = "Correspondence control center"; }
-<div class="d-flex justify-content-between align-items-start mb-4">
- <div><div class="text-uppercase text-primary small fw-bold">Correspondence management</div><h1 class="h2 mb-1">Executive control center</h1><p class="text-muted mb-0">Receive, assign, process and dispatch every official communication.</p></div>
- <div class="d-flex gap-2"><a class="btn btn-outline-primary" asp-action="Create" asp-route-direction="Incoming">Register incoming</a><a class="btn btn-primary" asp-action="Create" asp-route-direction="Outgoing">Prepare outgoing</a></div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <div class="text-uppercase text-primary small fw-bold">Correspondence management</div>
+        <h1 class="h2 mb-1">Executive control center</h1>
+        <p class="text-muted mb-0">Monitor workload, deadlines and operational risks from one place.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-dark d-inline-flex align-items-center gap-2" asp-controller="CorrespondenceActions" asp-action="Index" asp-route-myActions="true"><svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>Open action cockpit</a>
+        <a class="btn btn-outline-primary d-inline-flex align-items-center gap-2" asp-action="Create" asp-route-direction="Incoming"><svg class="icon" aria-hidden="true"><use href="#icon-inbox"></use></svg>Register incoming</a>
+        <a class="btn btn-primary d-inline-flex align-items-center gap-2" asp-action="Create" asp-route-direction="Outgoing"><svg class="icon" aria-hidden="true"><use href="#icon-send"></use></svg>Prepare outgoing</a>
+    </div>
 </div>
+
+<div class="row g-3 mb-3">
+    @foreach (var card in new[] {
+        ("Open workload", Model.Dashboard.TotalOpen, "primary", (CorrespondenceRiskFilter?)null, CorrespondenceMetric.OpenWorkload, "icon-file"),
+        ("Unassigned", Model.Dashboard.Unassigned, "warning", (CorrespondenceRiskFilter?)CorrespondenceRiskFilter.Unassigned, CorrespondenceMetric.Unassigned, "icon-user"),
+        ("Overdue", Model.Dashboard.Overdue, "danger", (CorrespondenceRiskFilter?)CorrespondenceRiskFilter.Overdue, CorrespondenceMetric.Overdue, "icon-alert"),
+        ("Due today", Model.Dashboard.DueToday, "warning", (CorrespondenceRiskFilter?)CorrespondenceRiskFilter.DueToday, CorrespondenceMetric.DueToday, "icon-calendar"),
+        ("Due in 5 days", Model.Dashboard.DueSoon, "info", (CorrespondenceRiskFilter?)CorrespondenceRiskFilter.DueSoon, CorrespondenceMetric.DueSoon, "icon-clock"),
+        ("Escalated", Model.Dashboard.EscalatedActions, "danger", (CorrespondenceRiskFilter?)CorrespondenceRiskFilter.Escalated, CorrespondenceMetric.Escalated, "icon-alert") })
+    {
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none js-kpi-card @(Model.Risk == card.Item4 ? "ring-active" : "")" asp-action="Index" asp-route-risk="@card.Item4" data-kpi-url="@Url.Action("KpiDetails", new { metric = card.Item5 })">
+                <div class="card-body"><div class="d-flex justify-content-between align-items-center"><div class="small text-muted">@card.Item1</div><span class="correspondence-kpi-icon text-@card.Item3"><svg class="icon" aria-hidden="true"><use href="#@card.Item6"></use></svg></span></div><div class="display-6 fw-semibold text-@card.Item3">@card.Item2</div><div class="small text-muted mt-1">View details &amp; export →</div></div>
+            </a>
+        </div>
+    }
+</div>
+
 <div class="row g-3 mb-4">
- @foreach(var card in new[]{("Open workload",Model.Dashboard.TotalOpen,"primary"),("Unassigned",Model.Dashboard.Unassigned,"warning"),("Overdue",Model.Dashboard.Overdue,"danger"),("Due in 5 days",Model.Dashboard.DueSoon,"warning"),("Awaiting validation",Model.Dashboard.AwaitingValidation,"info"),("Ready to send",Model.Dashboard.ReadyToSend,"success")}){
- <div class="col-6 col-lg-2"><div class="card h-100 border-0 shadow-sm"><div class="card-body"><div class="small text-muted">@card.Item1</div><div class="display-6 fw-semibold text-@card.Item3">@card.Item2</div></div></div></div> }
+    <div class="col-md-6 col-xl-3"><a asp-action="Index" asp-route-risk="Waiting" data-kpi-url="@Url.Action("KpiDetails", new { metric = CorrespondenceMetric.WaitingForThirdParty })" class="card border-0 bg-body-tertiary h-100 text-decoration-none js-kpi-card"><div class="card-body"><div class="d-flex justify-content-between"><div class="small text-muted">Waiting on third party</div><svg class="icon text-secondary" aria-hidden="true"><use href="#icon-clock"></use></svg></div><div class="h3 mb-0">@Model.Dashboard.WaitingActions</div><span class="small">Review details &amp; export →</span></div></a></div>
+    <div class="col-md-6 col-xl-3"><a asp-action="Index" data-kpi-url="@Url.Action("KpiDetails", new { metric = CorrespondenceMetric.ClosedLast30Days })" class="card border-0 bg-body-tertiary h-100 text-decoration-none js-kpi-card"><div class="card-body"><div class="small text-muted">Closed in last 30 days</div><div class="h3 mb-0">@Model.Dashboard.ClosedLast30Days</div><span class="small text-muted">Average: @Model.Dashboard.AverageProcessingDays days</span></div></a></div>
+    <div class="col-md-6 col-xl-3"><a asp-action="Index" data-kpi-url="@Url.Action("KpiDetails", new { metric = CorrespondenceMetric.OnTimeClosure })" class="card border-0 bg-body-tertiary h-100 text-decoration-none js-kpi-card"><div class="card-body"><div class="small text-muted">On-time closure rate</div><div class="h3 mb-0">@Model.Dashboard.OnTimeClosureRate%</div><div class="progress mt-2" style="height:6px"><div class="progress-bar" style="width:@Model.Dashboard.OnTimeClosureRate%"></div></div></div></a></div>
+    <div class="col-md-6 col-xl-3"><div class="card border-0 bg-body-tertiary h-100"><div class="card-body"><div class="small text-muted">Open flow</div><div class="d-flex justify-content-between mt-2"><a asp-action="Index" asp-route-direction="Incoming" data-kpi-url="@Url.Action("KpiDetails", new { metric = CorrespondenceMetric.IncomingOpen })" class="js-kpi-card">Incoming <strong>@Model.Dashboard.IncomingOpen</strong></a><a asp-action="Index" asp-route-direction="Outgoing" data-kpi-url="@Url.Action("KpiDetails", new { metric = CorrespondenceMetric.OutgoingOpen })" class="js-kpi-card">Outgoing <strong>@Model.Dashboard.OutgoingOpen</strong></a></div><div class="progress mt-3" style="height:6px"><div class="progress-bar" style="width:@(Model.Dashboard.TotalOpen == 0 ? 0 : 100 * Model.Dashboard.IncomingOpen / Model.Dashboard.TotalOpen)%"></div><div class="progress-bar bg-dark" style="width:@(Model.Dashboard.TotalOpen == 0 ? 0 : 100 * Model.Dashboard.OutgoingOpen / Model.Dashboard.TotalOpen)%"></div></div></div></div></div>
 </div>
-<div class="card border-0 shadow-sm">+ <div class="card-header bg-white py-3"><form class="row g-2 align-items-center" method="get"><div class="col-lg-4"><input class="form-control" name="search" value="@Model.Search" placeholder="Reference, subject or organisation" /></div><div class="col-lg-2"><select class="form-select" name="direction" asp-for="Direction" asp-items="Html.GetEnumSelectList<EthanTcm.Domain.Enums.CorrespondenceDirection>()"><option value="">All directions</option></select></div><div class="col-lg-2"><select class="form-select" name="status" asp-for="Status" asp-items="Html.GetEnumSelectList<EthanTcm.Domain.Enums.CorrespondenceStatus>()"><option value="">All statuses</option></select></div><div class="col-lg-2 form-check ms-2"><input class="form-check-input" type="checkbox" name="myItems" value="true" checked="@Model.MyItems" id="mine"><label for="mine">My portfolio</label></div><div class="col"><button class="btn btn-dark w-100">Apply</button></div></form></div>
- <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Reference</th><th>Direction</th><th>Subject / counterparty</th><th>Owner</th><th>Due date</th><th>Status</th><th></th></tr></thead><tbody>
- @if(Model.Page.Items.Count==0){<tr><td colspan="7" class="text-center text-muted py-5">No correspondence matches this portfolio.</td></tr>}
- @foreach(var x in Model.Page.Items){<tr class="@(x.IsOverdue?"table-danger":"")"><td><span class="fw-semibold">@x.Reference</span><div class="small text-muted">@x.CorrespondenceDate.ToString("dd MMM yyyy")</div></td><td><span class="badge text-bg-@(x.Direction==EthanTcm.Domain.Enums.CorrespondenceDirection.Incoming?"primary":"dark")">@x.Direction</span></td><td><div class="fw-semibold">@x.Subject</div><div class="small text-muted">@x.Counterparty</div></td><td>@(x.AssignedTo??"Unassigned")</td><td>@(x.DueDate?.ToString("dd MMM yyyy")??"—")</td><td><span class="badge rounded-pill text-bg-light border">@x.Status</span></td><td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@x.Id">Open</a></td></tr>}
- </tbody></table></div>
- <div class="card-footer bg-white d-flex justify-content-between"><span class="text-muted">@Model.Page.TotalCount records</span><div>@if(Model.Page.Page>1){<a class="btn btn-sm btn-outline-secondary" asp-route-page="@(Model.Page.Page-1)" asp-route-search="@Model.Search" asp-route-direction="@Model.Direction" asp-route-status="@Model.Status">Previous</a>} @if(Model.Page.Page<Model.Page.TotalPages){<a class="btn btn-sm btn-outline-secondary" asp-route-page="@(Model.Page.Page+1)" asp-route-search="@Model.Search" asp-route-direction="@Model.Direction" asp-route-status="@Model.Status">Next</a>}</div></div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+        <form class="row g-2 align-items-center" method="get">
+            <div class="col-lg-3"><input class="form-control" name="search" value="@Model.Search" placeholder="Reference, subject or organisation" /></div>
+            <div class="col-lg-2"><select class="form-select" name="direction" asp-for="Direction" asp-items="Html.GetEnumSelectList<CorrespondenceDirection>()"><option value="">All directions</option></select></div>
+            <div class="col-lg-2"><select class="form-select" name="status" asp-for="Status" asp-items="Html.GetEnumSelectList<CorrespondenceStatus>()"><option value="">All statuses</option></select></div>
+            <div class="col-lg-2"><select class="form-select" name="assignedToUserId" asp-for="AssignedToUserId" asp-items="Model.Users"><option value="">All owners</option></select></div>
+            <div class="col-lg-2"><select class="form-select" name="departmentId" asp-for="DepartmentId" asp-items="Model.Departments"><option value="">All departments</option></select></div>
+            <div class="col-lg-2"><select class="form-select" name="risk" asp-for="Risk" asp-items="Html.GetEnumSelectList<CorrespondenceRiskFilter>()"><option value="">All risk levels</option></select></div>
+            <div class="col-lg-2 form-check ms-2"><input class="form-check-input" type="checkbox" name="myItems" value="true" checked="@Model.MyItems" id="mine"><label class="form-check-label" for="mine">My portfolio</label></div>
+            <div class="col-lg-2"><button class="btn btn-dark w-100 d-inline-flex justify-content-center align-items-center gap-2"><svg class="icon" aria-hidden="true"><use href="#icon-filter"></use></svg>Apply filters</button></div>
+            <div class="col-lg-2"><a asp-action="Index" class="btn btn-outline-secondary w-100 d-inline-flex justify-content-center align-items-center gap-2"><svg class="icon" aria-hidden="true"><use href="#icon-x"></use></svg>Reset</a></div>
+        </form>
+    </div>
+    <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Reference</th><th>Direction</th><th>Subject / counterparty</th><th>Owner</th><th>Due date</th><th>Risk & actions</th><th>Status</th><th></th></tr></thead><tbody>
+    @if (Model.Page.Items.Count == 0) { <tr><td colspan="8" class="text-center py-5"><div class="h5">No correspondence found</div><div class="text-muted">Adjust the filters or register a new correspondence.</div></td></tr> }
+    @foreach (var x in Model.Page.Items) {
+        <tr class="@(x.IsOverdue ? "table-danger" : x.DueDate.HasValue && x.DueDate <= DateOnly.FromDateTime(DateTime.Today).AddDays(5) ? "table-warning" : "")">
+            <td><span class="fw-semibold">@x.Reference</span><div class="small text-muted">@x.CorrespondenceDate.ToString("dd MMM yyyy")</div></td>
+            <td><span class="badge text-bg-@(x.Direction == CorrespondenceDirection.Incoming ? "primary" : "dark")">@x.Direction</span></td>
+            <td><div class="fw-semibold">@x.Subject</div><div class="small text-muted">@x.Counterparty</div></td>
+            <td>@if (x.AssignedTo is null) { <span class="badge text-bg-warning">Unassigned</span> } else { @x.AssignedTo }</td>
+            <td>@(x.DueDate?.ToString("dd MMM yyyy") ?? "—")</td>
+            <td><div class="d-flex flex-wrap gap-1">@if(x.Priority==CorrespondencePriority.Critical){<span class="badge text-bg-danger">Critical</span>} @if(x.IsOverdue){<span class="badge text-bg-danger">Overdue</span>} @if(x.HasEscalatedAction){<span class="badge text-bg-danger">Escalated</span>} @if(x.HasWaitingAction){<span class="badge text-bg-secondary">Waiting</span>} @if(x.OpenActions>0){<span class="badge text-bg-light border">@x.OpenActions open action@(x.OpenActions == 1 ? "" : "s")</span>}</div></td>
+            <td><span class="badge rounded-pill text-bg-light border">@x.Status</span></td>
+            <td><a class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" asp-action="Details" asp-route-id="@x.Id" aria-label="Open correspondence @x.Reference"><svg class="icon" aria-hidden="true"><use href="#icon-open"></use></svg>Open</a></td>
+        </tr>
+    }
+    </tbody></table></div>
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center"><span class="text-muted">@Model.Page.TotalCount records</span><div class="d-flex gap-1">@if(Model.Page.Page>1){<a class="btn btn-sm btn-outline-secondary" asp-route-page="@(Model.Page.Page-1)" asp-route-search="@Model.Search" asp-route-direction="@Model.Direction" asp-route-status="@Model.Status" asp-route-myItems="@Model.MyItems" asp-route-assignedToUserId="@Model.AssignedToUserId" asp-route-departmentId="@Model.DepartmentId" asp-route-risk="@Model.Risk">Previous</a>} @if(Model.Page.Page<Model.Page.TotalPages){<a class="btn btn-sm btn-outline-secondary" asp-route-page="@(Model.Page.Page+1)" asp-route-search="@Model.Search" asp-route-direction="@Model.Direction" asp-route-status="@Model.Status" asp-route-myItems="@Model.MyItems" asp-route-assignedToUserId="@Model.AssignedToUserId" asp-route-departmentId="@Model.DepartmentId" asp-route-risk="@Model.Risk">Next</a>}</div></div>
+</div>
+
+<style>.ring-active{outline:2px solid var(--bs-primary);outline-offset:2px}.card[href]:hover{transform:translateY(-2px);transition:transform .15s ease}.correspondence-kpi-icon{display:inline-grid;place-items:center;width:2rem;height:2rem;border-radius:50%;background:currentColor}.correspondence-kpi-icon .icon{color:#fff;width:1.05rem;height:1.05rem}</style>
+
+<div class="modal fade" id="dashboard-kpi-modal" tabindex="-1" aria-labelledby="dashboard-kpi-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content kpi-modal-content">
+        <div class="modal-header"><div><span class="eyebrow">Detailed analysis</span><h2 class="modal-title fs-5" id="dashboard-kpi-modal-title">KPI details</h2></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body js-kpi-modal-body" aria-live="polite"><div class="kpi-modal-loading"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Loading details…</span></div></div>
+    </div></div>
 </div>

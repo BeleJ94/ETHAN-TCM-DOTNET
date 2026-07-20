@@ -15,19 +15,27 @@
     var canImportTaxMatrix = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ImportTaxMatrix)).Succeeded;
     var canViewAuditLogs = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ViewAuditLogs)).Succeeded;
     var canRunAdministrationTasks = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.RunAdministrationTasks)).Succeeded;
+    var canViewUserAdministration = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ViewUserAdministration)).Succeeded;
     var canViewCorrespondence = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.ViewCorrespondence)).Succeeded;
+    var canCreateCorrespondence = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.CreateCorrespondence)).Succeeded;
+    var canAssignCorrespondence = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.AssignCorrespondence)).Succeeded;
     var hasDeclarationsMenu = canViewTaxDeclarations;
     var hasPaymentsMenu = canManagePayments;
     var hasReferentialMenu = canManageTaxObligations || canImportTaxMatrix;
     var hasMonitoringMenu = canViewAuditLogs || canViewTaxDeclarations;
-    var hasAdministrationMenu = canRunAdministrationTasks;
+    var hasAdministrationMenu = canRunAdministrationTasks || canViewUserAdministration;
     var isDeclarationsActive = activeController == "TaxDeclarations";
     var isPaymentsActive = activeController == "Payments";
-    var isCorrespondenceActive = activeController == "Correspondences";
+    var isCorrespondenceActive = activeController is "Correspondences" or "CorrespondenceActions" or "CorrespondenceOrganizations";
     var isReferentialActive = activeController is "TaxObligations" or "TaxMatrixImport";
     var isMonitoringActive = activeController == "AuditLogs" || (activeController == "Home" && activeDashboardView is nameof(DashboardView.LateItems) or nameof(DashboardView.ComplianceOverview));
-    var isAdministrationActive = activeController == "AdminSeed";
+    var isAdministrationActive = activeController is "AdminSeed" or "AccessAdministration";
     var showDevUserSwitcher = Environment.IsDevelopment() && AuthenticationOptions.Value.Mode == AuthMode.LocalAuth;
+    var isMonitoringDashboard = activeController == "Home" && activeDashboardView is nameof(DashboardView.LateItems) or nameof(DashboardView.ComplianceOverview);
+    var isMainDashboardActive = activeController == "Home" && !isMonitoringDashboard;
+    var correspondenceMyItems = Context.Request.Query["myItems"].ToString().Equals("true", StringComparison.OrdinalIgnoreCase);
+    var correspondenceMyActions = !Context.Request.Query["myActions"].ToString().Equals("false", StringComparison.OrdinalIgnoreCase);
+    var correspondenceDirection = Context.Request.Query["direction"].ToString();
     var currentDevProfile = Context.Request.Cookies.TryGetValue(EthanTcm.Web.Authentication.DevelopmentUserProfiles.CookieName, out var devProfileKey)
         ? devProfileKey
         : "administrator";
@@ -125,6 +133,29 @@
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-4-4" />
         </symbol>
+        <symbol id="icon-inbox" viewBox="0 0 24 24">
+            <path d="M4 4h16v16H4V4Z" />
+            <path d="M4 14h5l2 3h2l2-3h5" />
+            <path d="M12 4v7M9 8l3 3 3-3" />
+        </symbol>
+        <symbol id="icon-send" viewBox="0 0 24 24">
+            <path d="m3 11 18-8-8 18-2-8-8-2Z" />
+            <path d="m11 13 5-5" />
+        </symbol>
+        <symbol id="icon-filter" viewBox="0 0 24 24">
+            <path d="M4 5h16M7 12h10M10 19h4" />
+        </symbol>
+        <symbol id="icon-building" viewBox="0 0 24 24">
+            <path d="M4 21V5l8-3v19M12 8h8v13M2 21h20" />
+            <path d="M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2" />
+        </symbol>
+        <symbol id="icon-list" viewBox="0 0 24 24">
+            <path d="M9 6h11M9 12h11M9 18h11" />
+            <path d="M4 6h.01M4 12h.01M4 18h.01" />
+        </symbol>
+        <symbol id="icon-arrow-left" viewBox="0 0 24 24">
+            <path d="M19 12H5M11 6l-6 6 6 6" />
+        </symbol>
     </svg>
     <header class="app-header">
         <nav class="navbar navbar-expand-lg app-navbar">
@@ -143,7 +174,7 @@
                 <div id="mainNavigation" class="navbar-collapse collapse">
                     <ul class="navbar-nav app-top-nav">
                         <li class="nav-item">
-                            <a class="nav-link @(activeController == "Home" ? "active" : string.Empty)" asp-area="" asp-controller="Home" asp-action="Index">
+                            <a class="nav-link @(isMainDashboardActive ? "active" : string.Empty)" asp-area="" asp-controller="Home" asp-action="Index">
                                 <svg class="icon"><use href="#icon-dashboard"></use></svg>
                                 Dashboard
                             </a>
@@ -216,44 +247,28 @@
                         {
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle @(isCorrespondenceActive ? "active" : string.Empty)" href="#" id="correspondenceMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <svg class="icon"><use href="#icon-file"></use></svg>
+                                    <svg class="icon"><use href="#icon-inbox"></use></svg>
                                     Correspondence
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="correspondenceMenu">
-                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Index">Control center</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Index" asp-route-myItems="true">My portfolio</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Incoming">Register incoming</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Outgoing">Prepare outgoing</a></li>
+                                    <li><h6 class="dropdown-header">Overview</h6></li>
+                                    <li><a class="dropdown-item @(activeController == "Correspondences" && activeAction == "Index" && !correspondenceMyItems ? "active" : string.Empty)" asp-controller="Correspondences" asp-action="Index"><svg class="icon"><use href="#icon-dashboard"></use></svg>Control center</a></li>
                                     <li><hr class="dropdown-divider" /></li>
-                                    <li><a class="dropdown-item" asp-controller="CorrespondenceOrganizations" asp-action="Index">Correspondent organisations</a></li>
-                                </ul>
-                            </li>
-                        }
-                        @if (hasReferentialMenu)
-                        {
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle @(isReferentialActive ? "active" : string.Empty)" href="#" id="referentialMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <svg class="icon"><use href="#icon-database"></use></svg>
-                                    Referential
-                                </a>
-                                <ul class="dropdown-menu" aria-labelledby="referentialMenu">
-                                    @if (canManageTaxObligations)
+                                    <li><h6 class="dropdown-header">My work</h6></li>
+                                    <li><a class="dropdown-item @(activeController == "Correspondences" && activeAction == "Index" && correspondenceMyItems ? "active" : string.Empty)" asp-controller="Correspondences" asp-action="Index" asp-route-myItems="true"><svg class="icon"><use href="#icon-user"></use></svg>My portfolio</a></li>
+                                    <li><a class="dropdown-item @(activeController == "CorrespondenceActions" && correspondenceMyActions ? "active" : string.Empty)" asp-controller="CorrespondenceActions" asp-action="Index" asp-route-myActions="true"><svg class="icon"><use href="#icon-list"></use></svg>My follow-up actions</a></li>
+                                    @if (canCreateCorrespondence)
                                     {
-                                        <li>
-                                            <a class="dropdown-item @(activeController == "TaxObligations" ? "active" : string.Empty)" asp-controller="TaxObligations" asp-action="Index">
-                                                <svg class="icon"><use href="#icon-database"></use></svg>
-                                                Tax obligations
-                                            </a>
-                                        </li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li><h6 class="dropdown-header">New correspondence</h6></li>
+                                        <li><a class="dropdown-item @(activeController == "Correspondences" && activeAction == "Create" && correspondenceDirection == nameof(EthanTcm.Domain.Enums.CorrespondenceDirection.Incoming) ? "active" : string.Empty)" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Incoming"><svg class="icon"><use href="#icon-inbox"></use></svg>Register incoming</a></li>
+                                        <li><a class="dropdown-item @(activeController == "Correspondences" && activeAction == "Create" && correspondenceDirection == nameof(EthanTcm.Domain.Enums.CorrespondenceDirection.Outgoing) ? "active" : string.Empty)" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Outgoing"><svg class="icon"><use href="#icon-send"></use></svg>Prepare outgoing</a></li>
                                     }
-                                    @if (canImportTaxMatrix)
+                                    @if (canAssignCorrespondence)
                                     {
-                                        <li>
-                                            <a class="dropdown-item @(activeController == "TaxMatrixImport" ? "active" : string.Empty)" asp-controller="TaxMatrixImport" asp-action="Index">
-                                                <svg class="icon"><use href="#icon-upload"></use></svg>
-                                                Import matrix
-                                            </a>
-                                        </li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li><h6 class="dropdown-header">Configuration</h6></li>
+                                        <li><a class="dropdown-item @(activeController == "CorrespondenceOrganizations" ? "active" : string.Empty)" asp-controller="CorrespondenceOrganizations" asp-action="Index"><svg class="icon"><use href="#icon-building"></use></svg>Correspondent organisations</a></li>
                                     }
                                 </ul>
                             </li>
@@ -293,6 +308,35 @@
                                 </ul>
                             </li>
                         }
+                        @if (hasReferentialMenu)
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(isReferentialActive ? "active" : string.Empty)" href="#" id="referentialMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <svg class="icon"><use href="#icon-database"></use></svg>
+                                    Referential
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="referentialMenu">
+                                    @if (canManageTaxObligations)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item @(activeController == "TaxObligations" ? "active" : string.Empty)" asp-controller="TaxObligations" asp-action="Index">
+                                                <svg class="icon"><use href="#icon-database"></use></svg>
+                                                Tax obligations
+                                            </a>
+                                        </li>
+                                    }
+                                    @if (canImportTaxMatrix)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item @(activeController == "TaxMatrixImport" ? "active" : string.Empty)" asp-controller="TaxMatrixImport" asp-action="Index">
+                                                <svg class="icon"><use href="#icon-upload"></use></svg>
+                                                Import matrix
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </li>
+                        }
                         @if (hasAdministrationMenu)
                         {
                             <li class="nav-item dropdown">
@@ -301,12 +345,23 @@
                                     Administration
                                 </a>
                                 <ul class="dropdown-menu" aria-labelledby="administrationMenu">
+                                    @if (canViewUserAdministration)
+                                    {
+                                        <li><h6 class="dropdown-header">Access management</h6></li>
+                                        <li><a class="dropdown-item @(activeController == "AccessAdministration" && activeAction is "Index" or "Details" ? "active" : string.Empty)" asp-controller="AccessAdministration" asp-action="Index"><svg class="icon"><use href="#icon-user"></use></svg>Users</a></li>
+                                        <li><a class="dropdown-item @(activeController == "AccessAdministration" && activeAction == "Roles" ? "active" : string.Empty)" asp-controller="AccessAdministration" asp-action="Roles"><svg class="icon"><use href="#icon-shield"></use></svg>Roles &amp; permissions</a></li>
+                                    }
+                                    @if (canRunAdministrationTasks)
+                                    {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><h6 class="dropdown-header">System</h6></li>
                                     <li>
                                         <a class="dropdown-item @(activeController == "AdminSeed" ? "active" : string.Empty)" asp-controller="AdminSeed" asp-action="Index">
                                             <svg class="icon"><use href="#icon-user"></use></svg>
                                             Admin seed
                                         </a>
                                     </li>
+                                    }
                                 </ul>
                             </li>
                         }

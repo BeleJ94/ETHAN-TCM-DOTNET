@@ -72,7 +72,7 @@ public sealed class DashboardService(
                     obligation.Id,
                     obligation.Name,
                     obligation.RiskLevel,
-                    "Aucun responsable principal"))
+                    "No primary owner"))
                 .Take(50)
                 .ToArrayAsync(cancellationToken)
             : [];
@@ -421,7 +421,7 @@ public sealed class DashboardService(
                 "Active",
                 row.RiskLevel,
                 null,
-                "Responsable manquant",
+                "Missing owner",
                 0))
             .ToArray();
 
@@ -467,7 +467,7 @@ public sealed class DashboardService(
                     "Active",
                     obligation.RiskLevel,
                     null,
-                    "Responsable manquant",
+                    "Missing owner",
                     0))
                 .ToArrayAsync(cancellationToken);
         }
@@ -502,7 +502,7 @@ public sealed class DashboardService(
         IReadOnlyCollection<DashboardMetricDetailItemDto> items)
     {
         using var workbook = new XLWorkbook();
-        var worksheet = workbook.Worksheets.Add("Détails KPI");
+        var worksheet = workbook.Worksheets.Add("KPI details");
 
         worksheet.Cell(1, 1).Value = title;
         worksheet.Range(1, 1, 1, 8).Merge().Style
@@ -514,7 +514,7 @@ public sealed class DashboardService(
         worksheet.Range(2, 1, 2, 8).Merge().Style
             .Font.SetFontColor(XLColor.FromHtml("#445064"));
 
-        worksheet.Cell(4, 1).Value = "Vue";
+        worksheet.Cell(4, 1).Value = "View";
         worksheet.Cell(4, 2).Value = ViewLabel(view);
         worksheet.Cell(4, 4).Value = "Extraction";
         worksheet.Cell(4, 5).Value = generatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
@@ -522,7 +522,7 @@ public sealed class DashboardService(
         worksheet.Cell(4, 8).Value = items.Count;
         worksheet.Range(4, 1, 4, 8).Style.Font.SetBold();
 
-        var headers = new[] { "Taxe", "Période", "Échéance", "Statut", "Risque", "Responsable", "Décision attendue", "Retard" };
+        var headers = new[] { "Tax", "Period", "Deadline", "Status", "Risk", "Owner", "Expected action", "Days late" };
         for (var index = 0; index < headers.Length; index++)
         {
             worksheet.Cell(6, index + 1).Value = headers[index];
@@ -541,7 +541,7 @@ public sealed class DashboardService(
             worksheet.Cell(rowIndex, 3).Value = item.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
             worksheet.Cell(rowIndex, 4).Value = item.Status;
             worksheet.Cell(rowIndex, 5).Value = item.RiskLevel.ToString();
-            worksheet.Cell(rowIndex, 6).Value = item.AssignedTo ?? "Non attribué";
+            worksheet.Cell(rowIndex, 6).Value = item.AssignedTo ?? "Unassigned";
             worksheet.Cell(rowIndex, 7).Value = item.Issue;
             worksheet.Cell(rowIndex, 8).Value = item.DaysLate;
             rowIndex++;
@@ -582,14 +582,14 @@ public sealed class DashboardService(
         var y = 535;
         var columns = new[]
         {
-            new ExportPdfColumn(36, 174, "DECLARATION", "Taxe / obligation"),
-            new ExportPdfColumn(210, 70, "PERIODE", "Cycle fiscal"),
-            new ExportPdfColumn(280, 76, "ECHEANCE", "Date limite"),
-            new ExportPdfColumn(356, 90, "STATUT", "Workflow"),
-            new ExportPdfColumn(446, 58, "RISQUE", "Niveau"),
-            new ExportPdfColumn(504, 128, "RESPONSABLE", "Owner actuel"),
-            new ExportPdfColumn(632, 138, "DECISION", "Action attendue"),
-            new ExportPdfColumn(770, 36, "RETARD", "Jours")
+            new ExportPdfColumn(36, 174, "DECLARATION", "Tax / obligation"),
+            new ExportPdfColumn(210, 70, "PERIOD", "Tax cycle"),
+            new ExportPdfColumn(280, 76, "DEADLINE", "Due date"),
+            new ExportPdfColumn(356, 90, "STATUS", "Workflow"),
+            new ExportPdfColumn(446, 58, "RISK", "Level"),
+            new ExportPdfColumn(504, 128, "OWNER", "Current owner"),
+            new ExportPdfColumn(632, 138, "ACTION", "Expected action"),
+            new ExportPdfColumn(770, 36, "LATE", "Days")
         };
 
         void NewPage()
@@ -607,7 +607,7 @@ public sealed class DashboardService(
             ExportPdfFillRect(page, 28, 548, 786, 24, "0.05 0.22 0.36 rg");
             ExportPdfText(page, 40, 556, 13, true, title, "1 1 1 rg");
 
-            ExportPdfText(page, 40, 528, 8, true, "Vue");
+            ExportPdfText(page, 40, 528, 8, true, "View");
             ExportPdfText(page, 80, 528, 8, false, ViewLabel(view));
             ExportPdfText(page, 210, 528, 8, true, "Extraction");
             ExportPdfText(page, 286, 528, 8, false, generatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
@@ -631,7 +631,7 @@ public sealed class DashboardService(
         foreach (var item in items)
         {
             var nameLines = ExportPdfWrap(item.Name, 30).Take(2).DefaultIfEmpty("-").ToArray();
-            var ownerLines = ExportPdfWrap(item.AssignedTo ?? "Non attribue", 21).Take(2).DefaultIfEmpty("-").ToArray();
+            var ownerLines = ExportPdfWrap(item.AssignedTo ?? "Unassigned", 21).Take(2).DefaultIfEmpty("-").ToArray();
             var issueLines = ExportPdfWrap(item.Issue, 24).Take(2).DefaultIfEmpty("-").ToArray();
             var lineCount = new[] { nameLines.Length, ownerLines.Length, issueLines.Length }.Max();
             var rowHeight = Math.Max(26, 13 + (lineCount * 10));
@@ -888,16 +888,16 @@ public sealed class DashboardService(
             }
 
             y -= 6;
-            PdfText(current, 40, y, 9, true, $"Vue: {ViewLabel(view)}");
+            PdfText(current, 40, y, 9, true, $"View: {ViewLabel(view)}");
             PdfText(current, 250, y, 9, true, $"Extraction: {generatedAt.ToLocalTime():yyyy-MM-dd HH:mm}");
             PdfText(current, 455, y, 9, true, $"Total: {items.Count}");
             y -= 22;
-            PdfText(current, 40, y, 8, true, "Taxe");
-            PdfText(current, 190, y, 8, true, "Période");
-            PdfText(current, 250, y, 8, true, "Échéance");
-            PdfText(current, 310, y, 8, true, "Statut");
-            PdfText(current, 385, y, 8, true, "Risque");
-            PdfText(current, 435, y, 8, true, "Décision");
+            PdfText(current, 40, y, 8, true, "Tax");
+            PdfText(current, 190, y, 8, true, "Period");
+            PdfText(current, 250, y, 8, true, "Deadline");
+            PdfText(current, 310, y, 8, true, "Status");
+            PdfText(current, 385, y, 8, true, "Risk");
+            PdfText(current, 435, y, 8, true, "Action");
             y -= 12;
             PdfLine(current, 40, y + 7, 555, y + 7);
         }
@@ -919,10 +919,10 @@ public sealed class DashboardService(
             y -= 14;
             if (!string.IsNullOrWhiteSpace(item.AssignedTo) || item.DaysLate > 0)
             {
-                var meta = $"Responsable: {item.AssignedTo ?? "Non attribué"}";
+                var meta = $"Owner: {item.AssignedTo ?? "Unassigned"}";
                 if (item.DaysLate > 0)
                 {
-                    meta += $" | Retard: {item.DaysLate} jour(s)";
+                    meta += $" | Late: {item.DaysLate} day(s)";
                 }
 
                 PdfText(current, 52, y, 7, false, Truncate(meta, 95));
@@ -1054,14 +1054,14 @@ public sealed class DashboardService(
 
     private static string ViewLabel(DashboardView view) => view switch
     {
-        DashboardView.MyTasks => "Mes tâches",
-        DashboardView.TeamTasks => "Équipe",
-        DashboardView.ManagementOverview => "Supervision",
-        DashboardView.LateItems => "Retards",
-        DashboardView.ComplianceOverview => "Conformité",
-        DashboardView.PaymentPending => "Paiements en attente",
-        DashboardView.LatePayments => "Paiements en retard",
-        DashboardView.MissingPaymentProof => "Preuves de paiement manquantes",
+        DashboardView.MyTasks => "My tasks",
+        DashboardView.TeamTasks => "Team",
+        DashboardView.ManagementOverview => "Management overview",
+        DashboardView.LateItems => "Late items",
+        DashboardView.ComplianceOverview => "Compliance",
+        DashboardView.PaymentPending => "Pending payments",
+        DashboardView.LatePayments => "Late payments",
+        DashboardView.MissingPaymentProof => "Missing payment evidence",
         _ => view.ToString()
     };
 
@@ -1239,33 +1239,33 @@ public sealed class DashboardService(
 
     private static (string Title, string Definition) MetricMetadata(DashboardMetric metric) => metric switch
     {
-        DashboardMetric.DueToday => ("Échéances du jour", "Déclarations ouvertes dont l’échéance est aujourd’hui."),
-        DashboardMetric.DueSoon => ("Échéances sous 5 jours", "Déclarations ouvertes attendues dans les quatre prochains jours, hors aujourd’hui."),
-        DashboardMetric.DueThisWeek => ("Échéances de la semaine", "Déclarations ouvertes arrivant à échéance pendant la semaine civile en cours."),
-        DashboardMetric.DueThisMonth => ("Échéances du mois", "Déclarations ouvertes arrivant à échéance pendant le mois civil en cours."),
-        DashboardMetric.Late => ("Déclarations en retard", "Déclarations ouvertes dont l’échéance est dépassée et qui ne sont ni soumises ni payées."),
-        DashboardMetric.AwaitingApproval => ("Validations en attente", "Déclarations engagées dans un niveau du circuit d’approbation."),
-        DashboardMetric.PendingPayments => ("Paiements en attente", "Déclarations soumises dont le paiement reste à exécuter."),
-        DashboardMetric.MissingSubmissionProof => ("Preuves de dépôt manquantes", "Déclarations soumises ou payées sans preuve de dépôt active."),
-        DashboardMetric.MissingPaymentProof => ("Preuves de paiement manquantes", "Déclarations payables en attente ou payées sans preuve de paiement active."),
-        DashboardMetric.ObligationsWithoutResponsible => ("Taxes sans responsable", "Obligations fiscales actives sans préparateur ni responsable principal."),
-        DashboardMetric.PenaltyRisk => ("Exposition aux pénalités", "Retards, échéances proches non préparées, risques élevés ou preuves réglementaires manquantes."),
-        _ => ("Détail du KPI", "Éléments composant cet indicateur.")
+        DashboardMetric.DueToday => ("Due today", "Open declarations due today."),
+        DashboardMetric.DueSoon => ("Due within 5 days", "Open declarations due in the next four days, excluding today."),
+        DashboardMetric.DueThisWeek => ("Due this week", "Open declarations due during the current calendar week."),
+        DashboardMetric.DueThisMonth => ("Due this month", "Open declarations due during the current calendar month."),
+        DashboardMetric.Late => ("Late declarations", "Open declarations past their deadline that have not been submitted or paid."),
+        DashboardMetric.AwaitingApproval => ("Pending approvals", "Declarations currently in an approval stage."),
+        DashboardMetric.PendingPayments => ("Pending payments", "Submitted declarations for which payment remains outstanding."),
+        DashboardMetric.MissingSubmissionProof => ("Missing submission evidence", "Submitted or paid declarations without active submission evidence."),
+        DashboardMetric.MissingPaymentProof => ("Missing payment evidence", "Payable or paid declarations without active payment evidence."),
+        DashboardMetric.ObligationsWithoutResponsible => ("Taxes without an owner", "Active tax obligations without a preparer or primary owner."),
+        DashboardMetric.PenaltyRisk => ("Penalty exposure", "Late items, unprepared upcoming deadlines, high risks or missing regulatory evidence."),
+        _ => ("KPI details", "Items included in this indicator.")
     };
 
     private static string MetricIssue(DashboardMetric metric) => metric switch
     {
-        DashboardMetric.DueToday => "À traiter aujourd’hui",
-        DashboardMetric.DueSoon => "Échéance proche",
-        DashboardMetric.DueThisWeek => "À planifier cette semaine",
-        DashboardMetric.DueThisMonth => "À planifier ce mois",
-        DashboardMetric.Late => "En retard",
-        DashboardMetric.AwaitingApproval => "Validation attendue",
-        DashboardMetric.PendingPayments => "Paiement attendu",
-        DashboardMetric.MissingSubmissionProof => "Preuve de dépôt manquante",
-        DashboardMetric.MissingPaymentProof => "Preuve de paiement manquante",
-        DashboardMetric.PenaltyRisk => "Risque de pénalité",
-        _ => "À examiner"
+        DashboardMetric.DueToday => "Action required today",
+        DashboardMetric.DueSoon => "Upcoming deadline",
+        DashboardMetric.DueThisWeek => "Plan this week",
+        DashboardMetric.DueThisMonth => "Plan this month",
+        DashboardMetric.Late => "Late",
+        DashboardMetric.AwaitingApproval => "Approval required",
+        DashboardMetric.PendingPayments => "Payment required",
+        DashboardMetric.MissingSubmissionProof => "Missing submission evidence",
+        DashboardMetric.MissingPaymentProof => "Missing payment evidence",
+        DashboardMetric.PenaltyRisk => "Penalty risk",
+        _ => "Review required"
     };
 
     private bool CanViewGlobalDashboard()
@@ -1341,10 +1341,10 @@ public sealed class DashboardService(
         var label = ChartSegmentLabel(chart, segmentKey);
         return chart switch
         {
-            DashboardChartType.DueDateBuckets => ($"Echeance - {label}", "Declarations du perimetre actif correspondant a cette tranche d'echeance."),
-            DashboardChartType.StatusDistribution => ($"Statut - {label}", "Declarations du perimetre actif ayant ce statut de workflow."),
-            DashboardChartType.RiskDistribution => ($"Risque - {label}", "Declarations du perimetre actif correspondant a ce niveau de risque."),
-            DashboardChartType.OwnerWorkload => ($"Responsable - {label}", "Declarations ouvertes actuellement attribuees a ce responsable."),
+            DashboardChartType.DueDateBuckets => ($"Deadline - {label}", "Declarations within the active scope matching this deadline range."),
+            DashboardChartType.StatusDistribution => ($"Status - {label}", "Declarations within the active scope with this workflow status."),
+            DashboardChartType.RiskDistribution => ($"Risk - {label}", "Declarations within the active scope matching this risk level."),
+            DashboardChartType.OwnerWorkload => ($"Owner - {label}", "Open declarations currently assigned to this owner."),
             _ => (label, "Details du segment selectionne.")
         };
     }
@@ -1355,12 +1355,12 @@ public sealed class DashboardService(
         {
             DashboardChartType.DueDateBuckets => segmentKey switch
             {
-                "late" => "En retard",
-                "today" => "Aujourd'hui",
-                "due-soon" => "Sous 5 jours",
-                "this-week" => "Cette semaine",
-                "this-month" => "Ce mois",
-                "later" => "Plus tard",
+                "late" => "Late",
+                "today" => "Today",
+                "due-soon" => "Within 5 days",
+                "this-week" => "This week",
+                "this-month" => "This month",
+                "later" => "Later",
                 _ => segmentKey
             },
             DashboardChartType.StatusDistribution when Enum.TryParse<TaxDeclarationStatus>(segmentKey, true, out var status) => StatusLabel(status),
@@ -1380,20 +1380,20 @@ public sealed class DashboardService(
 
         var dueBuckets = ToChartPoints(
             [
-                new DashboardChartSeed("late", "En retard", declarations.Count(declaration => IsLate(declaration, today)), "danger"),
-                new DashboardChartSeed("today", "Aujourd'hui", declarations.Count(declaration => !IsLate(declaration, today) && declaration.DueDate == today), "warning"),
-                new DashboardChartSeed("due-soon", "Sous 5 jours", declarations.Count(declaration => IsDueInLessThanFiveDays(declaration, today)), "warning"),
-                new DashboardChartSeed("this-week", "Cette semaine", declarations.Count(declaration =>
+                new DashboardChartSeed("late", "Late", declarations.Count(declaration => IsLate(declaration, today)), "danger"),
+                new DashboardChartSeed("today", "Today", declarations.Count(declaration => !IsLate(declaration, today) && declaration.DueDate == today), "warning"),
+                new DashboardChartSeed("due-soon", "Within 5 days", declarations.Count(declaration => IsDueInLessThanFiveDays(declaration, today)), "warning"),
+                new DashboardChartSeed("this-week", "This week", declarations.Count(declaration =>
                     declaration.DueDate >= today.AddDays(5) &&
                     declaration.DueDate <= endOfWeek), "info"),
-                new DashboardChartSeed("this-month", "Ce mois", declarations.Count(declaration =>
+                new DashboardChartSeed("this-month", "This month", declarations.Count(declaration =>
                     declaration.DueDate > endOfWeek &&
                     declaration.DueDate <= endOfMonth), "info"),
-                new DashboardChartSeed("later", "Plus tard", declarations.Count(declaration => declaration.DueDate > endOfMonth), "neutral")
+                new DashboardChartSeed("later", "Later", declarations.Count(declaration => declaration.DueDate > endOfMonth), "neutral")
             ]);
 
         var statusDistribution = declarations.Count == 0
-            ? ToChartPoints([new DashboardChartSeed("empty", "Aucun dossier", 0, "neutral")])
+            ? ToChartPoints([new DashboardChartSeed("empty", "No items", 0, "neutral")])
             : ToChartPoints(declarations
                 .GroupBy(declaration => declaration.Status)
                 .OrderByDescending(group => group.Count())
@@ -1445,20 +1445,20 @@ public sealed class DashboardService(
 
     private static string StatusLabel(TaxDeclarationStatus status) => status switch
     {
-        TaxDeclarationStatus.ToPrepare => "A preparer",
-        TaxDeclarationStatus.InPreparation => "En preparation",
-        TaxDeclarationStatus.SubmittedForReview => "En validation",
-        TaxDeclarationStatus.ApprovedLevel1 => "Validation N1",
-        TaxDeclarationStatus.ApprovedLevel2 => "Validation N2",
-        TaxDeclarationStatus.ApprovedLevel3 => "Validation N3",
-        TaxDeclarationStatus.ReadyForSubmission => "Pret depot",
-        TaxDeclarationStatus.Rejected => "Rejetee",
-        TaxDeclarationStatus.Submitted => "Soumise",
-        TaxDeclarationStatus.PaymentPending => "Paiement attendu",
-        TaxDeclarationStatus.Paid => "Payee",
-        TaxDeclarationStatus.Late => "En retard",
-        TaxDeclarationStatus.Closed => "Cloturee",
-        TaxDeclarationStatus.Cancelled => "Annulee",
+        TaxDeclarationStatus.ToPrepare => "To prepare",
+        TaxDeclarationStatus.InPreparation => "In preparation",
+        TaxDeclarationStatus.SubmittedForReview => "Under review",
+        TaxDeclarationStatus.ApprovedLevel1 => "Level 1 approved",
+        TaxDeclarationStatus.ApprovedLevel2 => "Level 2 approved",
+        TaxDeclarationStatus.ApprovedLevel3 => "Level 3 approved",
+        TaxDeclarationStatus.ReadyForSubmission => "Ready for submission",
+        TaxDeclarationStatus.Rejected => "Rejected",
+        TaxDeclarationStatus.Submitted => "Submitted",
+        TaxDeclarationStatus.PaymentPending => "Payment pending",
+        TaxDeclarationStatus.Paid => "Paid",
+        TaxDeclarationStatus.Late => "Late",
+        TaxDeclarationStatus.Closed => "Closed",
+        TaxDeclarationStatus.Cancelled => "Cancelled",
         TaxDeclarationStatus.NotApplicable => "Non applicable",
         _ => status.ToString()
     };
@@ -1484,40 +1484,40 @@ public sealed class DashboardService(
     {
         if (IsLate(declaration, today))
         {
-            return "En retard";
+            return "Late";
         }
 
         if (ApprovalStatuses.Contains(declaration.Status))
         {
-            return "Validation attendue";
+            return "Approval required";
         }
 
         if (declaration.Status == TaxDeclarationStatus.PaymentPending)
         {
-            return "Paiement attendu";
+            return "Payment pending";
         }
 
         if (MissingSubmissionProof(declaration))
         {
-            return "Preuve de dépôt manquante";
+            return "Missing submission evidence";
         }
 
         if (MissingPaymentProof(declaration))
         {
-            return "Preuve de paiement manquante";
+            return "Missing payment evidence";
         }
 
         if (declaration.DueDate == today)
         {
-            return "Échéance aujourd’hui";
+            return "Due today";
         }
 
         if (IsDueInLessThanFiveDays(declaration, today))
         {
-            return "Échéance sous 5 jours";
+            return "Due within 5 days";
         }
 
-        return "À venir";
+        return "Upcoming";
     }
 
     private static bool IsLate(DashboardDeclarationRow declaration, DateOnly today)

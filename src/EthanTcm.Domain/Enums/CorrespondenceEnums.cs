@@ -12,3 +12,4 @@ public enum CorrespondenceStatus
     Cancelled = 14, FiledWithoutAction = 15
 }
 public enum CorrespondenceDocumentType { Original = 1, Attachment = 2, SignedVersion = 3, DispatchProof = 4, Acknowledgement = 5, Other = 6 }
+public enum CorrespondenceActionStatus { ToDo = 1, InProgress = 2, WaitingForThirdParty = 3, Completed = 4, Cancelled = 5 }

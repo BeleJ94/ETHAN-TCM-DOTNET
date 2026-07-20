@@ -1,0 +1,90 @@
+@model AccessDeniedViewModel
+
+@{
+    ViewData["Title"] = "Access restricted";
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isAccessRestricted = Model.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden;
+    var isNotFound = Model.StatusCode == StatusCodes.Status404NotFound;
+    var pageTitle = isAccessRestricted ? "Access restricted" : isNotFound ? "Page not found" : "Page unavailable";
+    ViewData["Title"] = pageTitle;
+}
+
+<section class="access-denied-shell" aria-labelledby="access-denied-title">
+    <div class="access-denied-card">
+        <div class="access-denied-visual" aria-hidden="true">
+            <span class="access-denied-icon">
+                <svg class="icon"><use href="#icon-shield"></use></svg>
+            </span>
+            <span class="access-denied-code">@Model.StatusCode</span>
+        </div>
+
+        <div class="access-denied-content">
+            <div class="text-uppercase text-primary small fw-bold mb-2">Secure access · ETHAN TCM</div>
+            <h1 id="access-denied-title">@pageTitle</h1>
+            <p class="access-denied-lead">
+                @if (isAccessRestricted && isAuthenticated)
+                {
+                    <text>Your identity has been recognised, but your current application permissions do not allow access to this page.</text>
+                }
+                else if (isAccessRestricted)
+                {
+                    <text>You must be authenticated and have an active ETHAN TCM account to access this page.</text>
+                }
+                else if (isNotFound)
+                {
+                    <text>The requested page does not exist, may have moved, or is no longer available.</text>
+                }
+                else
+                {
+                    <text>ETHAN TCM cannot display the requested page at this time.</text>
+                }
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.RequestedPath))
+            {
+                <div class="access-denied-resource">
+                    <span>Requested resource</span>
+                    <code>@Model.RequestedPath</code>
+                </div>
+            }
+
+            @if (isAccessRestricted && isAuthenticated)
+            {
+                <div class="access-denied-context">
+                    <div>
+                        <span>Signed in as</span>
+                        <strong>@(string.IsNullOrWhiteSpace(Model.DisplayName) ? User.Identity?.Name : Model.DisplayName)</strong>
+                    </div>
+                    <div>
+                        <span>Application roles</span>
+                        <strong>@(Model.Roles.Count == 0 ? "No role assigned" : string.Join(", ", Model.Roles))</strong>
+                    </div>
+                </div>
+            }
+
+            @if (isAccessRestricted)
+            {
+                <div class="access-denied-guidance">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-alert"></use></svg>
+                    <p><strong>Need access?</strong> Contact an ETHAN TCM administrator and provide the reference below. Access is governed by application roles and permissions.</p>
+                </div>
+            }
+
+            <div class="access-denied-actions">
+                <a asp-controller="Home" asp-action="Index" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
+                    Return to dashboard
+                </a>
+                @if (isAccessRestricted && isAuthenticated)
+                {
+                    <a asp-controller="Account" asp-action="Profile" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                        <svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+                        View my access profile
+                    </a>
+                }
+            </div>
+
+            <p class="access-denied-reference">Technical reference: <code>@Model.TraceIdentifier</code></p>
+        </div>
+    </div>
+</section>

@@ -16,8 +16,36 @@ public sealed class CorrespondenceModelConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.RowVersion).IsRowVersion(); b.HasIndex(x => new { x.Status, x.DueDate }); b.HasIndex(x => new { x.AssignedToUserId, x.Status });
         b.HasMany(x => x.History).WithOne().HasForeignKey(x => x.CorrespondenceId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(x => x.Documents).WithOne().HasForeignKey(x => x.CorrespondenceId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(x => x.FollowUpActions).WithOne().HasForeignKey(x => x.CorrespondenceId).OnDelete(DeleteBehavior.Cascade);
         b.HasOne<CorrespondenceOrganization>().WithMany().HasForeignKey(x => x.CorrespondentOrganizationId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Department>().WithMany().HasForeignKey(x => x.InternalDepartmentId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+public sealed class CorrespondenceFollowUpActionConfiguration : IEntityTypeConfiguration<CorrespondenceFollowUpAction>
+{
+    public void Configure(EntityTypeBuilder<CorrespondenceFollowUpAction> b)
+    {
+        b.ToTable("CorrespondenceFollowUpActions"); b.HasKey(x => x.Id);
+        b.Property(x => x.Title).HasMaxLength(250).IsRequired(); b.Property(x => x.Description).HasMaxLength(1500);
+        b.Property(x => x.WaitingFor).HasMaxLength(500); b.Property(x => x.CompletionResult).HasMaxLength(1500);
+        b.Property(x => x.RowVersion).IsRowVersion();
+        b.HasIndex(x => new { x.AssignedToUserId, x.Status, x.DueDate }); b.HasIndex(x => new { x.CorrespondenceId, x.Status });
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.EscalationUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+public sealed class CorrespondenceActionNotificationConfiguration : IEntityTypeConfiguration<CorrespondenceActionNotification>
+{
+    public void Configure(EntityTypeBuilder<CorrespondenceActionNotification> b)
+    {
+        b.ToTable("CorrespondenceActionNotifications"); b.HasKey(x => x.Id);
+        b.Property(x => x.Trigger).HasMaxLength(30).IsRequired();
+        b.Property(x => x.Subject).HasMaxLength(300).IsRequired(); b.Property(x => x.Message).HasMaxLength(3000).IsRequired();
+        b.Property(x => x.ErrorMessage).HasMaxLength(2000); b.Property(x => x.RowVersion).IsRowVersion();
+        b.HasIndex(x => new { x.CorrespondenceActionId, x.RecipientUserId, x.Trigger }).IsUnique();
+        b.HasIndex(x => new { x.Status, x.ProcessingDate });
+        b.HasOne<CorrespondenceFollowUpAction>().WithMany().HasForeignKey(x => x.CorrespondenceActionId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.RecipientUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 public sealed class CorrespondenceOrganizationConfiguration : IEntityTypeConfiguration<CorrespondenceOrganization>

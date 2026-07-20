@@ -7,6 +7,7 @@ public sealed class Correspondence : AuditableEntity
 {
     private readonly List<CorrespondenceHistory> _history = [];
     private readonly List<CorrespondenceDocument> _documents = [];
+    private readonly List<CorrespondenceFollowUpAction> _followUpActions = [];
     private Correspondence() { }
 
     public Correspondence(CorrespondenceDirection direction, string subject, string? businessReference, DateOnly correspondenceDate,
@@ -48,6 +49,7 @@ public sealed class Correspondence : AuditableEntity
     public DateTimeOffset? ClosedAt { get; private set; }
     public IReadOnlyCollection<CorrespondenceHistory> History => _history;
     public IReadOnlyCollection<CorrespondenceDocument> Documents => _documents;
+    public IReadOnlyCollection<CorrespondenceFollowUpAction> FollowUpActions => _followUpActions;
 
     public void Register(string reference, Guid actor, DateTimeOffset at)
     {
@@ -77,6 +79,8 @@ public sealed class Correspondence : AuditableEntity
             _ => false
         };
         if (!allowed) throw new DomainException($"Transition from {Status} to {target} is not allowed.");
+        if (target == CorrespondenceStatus.Closed && _followUpActions.Any(item => item.Status is not (CorrespondenceActionStatus.Completed or CorrespondenceActionStatus.Cancelled)))
+            throw new DomainException("Complete or cancel all follow-up actions before closing the correspondence.");
         if (target == CorrespondenceStatus.Rejected && string.IsNullOrWhiteSpace(comment)) throw new DomainException("A rejection comment is required.");
         var old = Status; Status = target; if (target == CorrespondenceStatus.Sent) SentAt = at;
         if (target == CorrespondenceStatus.Closed) ClosedAt = at;
