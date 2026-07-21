@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Decision dashboard" xml:space="preserve"><value>Tableau de bord décisionnel</value></data>
+  <data name="Tax management" xml:space="preserve"><value>Pilotage fiscal</value></data>
+  <data name="Prioritize deadlines, approvals, payments and compliance issues." xml:space="preserve"><value>Priorisez les échéances, validations, paiements et anomalies de conformité.</value></data>
+  <data name="My tasks" xml:space="preserve"><value>Mes tâches</value></data>
+  <data name="Team" xml:space="preserve"><value>Équipe</value></data>
+  <data name="Management" xml:space="preserve"><value>Supervision</value></data>
+  <data name="Late items" xml:space="preserve"><value>Éléments en retard</value></data>
+  <data name="Compliance" xml:space="preserve"><value>Conformité</value></data>
+  <data name="Active filter" xml:space="preserve"><value>Filtre actif</value></data>
+  <data name="Active view" xml:space="preserve"><value>Vue active</value></data>
+  <data name="Open declarations" xml:space="preserve"><value>Déclarations ouvertes</value></data>
+  <data name="Evidence coverage" xml:space="preserve"><value>Couverture des preuves</value></data>
+  <data name="Last refreshed" xml:space="preserve"><value>Dernière actualisation</value></data>
+  <data name="Operational priorities" xml:space="preserve"><value>Priorités opérationnelles</value></data>
+  <data name="Late declarations" xml:space="preserve"><value>Déclarations en retard</value></data>
+  <data name="Due today" xml:space="preserve"><value>Échéances du jour</value></data>
+  <data name="Pending approvals" xml:space="preserve"><value>Validations en attente</value></data>
+  <data name="Pending payments" xml:space="preserve"><value>Paiements en attente</value></data>
+  <data name="Compliance and exposure" xml:space="preserve"><value>Conformité et exposition</value></data>
+  <data name="Penalty exposure" xml:space="preserve"><value>Exposition aux pénalités</value></data>
+  <data name="Missing submission evidence" xml:space="preserve"><value>Preuves de dépôt manquantes</value></data>
+  <data name="Missing payment evidence" xml:space="preserve"><value>Preuves de paiement manquantes</value></data>
+  <data name="Taxes without an owner" xml:space="preserve"><value>Taxes sans responsable</value></data>
+  <data name="Upcoming workload" xml:space="preserve"><value>Charge à venir</value></data>
+  <data name="Due within 5 days" xml:space="preserve"><value>Échéances sous 5 jours</value></data>
+  <data name="Due this week" xml:space="preserve"><value>Échéances de la semaine</value></data>
+  <data name="Due this month" xml:space="preserve"><value>Échéances du mois</value></data>
+  <data name="Tax" xml:space="preserve"><value>Taxe</value></data>
+  <data name="Period" xml:space="preserve"><value>Période</value></data>
+  <data name="Deadline" xml:space="preserve"><value>Échéance</value></data>
+  <data name="Status" xml:space="preserve"><value>Statut</value></data>
+  <data name="Expected action" xml:space="preserve"><value>Décision attendue</value></data>
+  <data name="Risk" xml:space="preserve"><value>Risque</value></data>
+  <data name="Owner" xml:space="preserve"><value>Responsable</value></data>
+  <data name="Open" xml:space="preserve"><value>Ouvrir</value></data>
+  <data name="Close" xml:space="preserve"><value>Fermer</value></data>
+  <data name="KPI details" xml:space="preserve"><value>Détail du KPI</value></data>
+  <data name="Loading details…" xml:space="preserve"><value>Chargement du détail…</value></data>
+  <data name="Indicator breakdown" xml:space="preserve"><value>Composition de l’indicateur</value></data>
+  <data name="Unassigned" xml:space="preserve"><value>Non attribué</value></data>
+  <data name="Previous" xml:space="preserve"><value>Précédent</value></data>
+  <data name="Next" xml:space="preserve"><value>Suivant</value></data>
+  <data name="Interface language" xml:space="preserve"><value>Langue de l’interface</value></data>
+  <data name="English" xml:space="preserve"><value>Anglais</value></data>
+  <data name="French" xml:space="preserve"><value>Français</value></data>
+  <data name="To prepare" xml:space="preserve"><value>À préparer</value></data>
+  <data name="In preparation" xml:space="preserve"><value>En préparation</value></data>
+  <data name="Under review" xml:space="preserve"><value>En validation</value></data>
+  <data name="Level 1 approved" xml:space="preserve"><value>Validation N1</value></data>
+  <data name="Level 2 approved" xml:space="preserve"><value>Validation N2</value></data>
+  <data name="Level 3 approved" xml:space="preserve"><value>Validation N3</value></data>
+  <data name="Ready for submission" xml:space="preserve"><value>Prête au dépôt</value></data>
+  <data name="Rejected" xml:space="preserve"><value>Rejetée</value></data>
+  <data name="Submitted" xml:space="preserve"><value>Soumise</value></data>
+  <data name="Payment pending" xml:space="preserve"><value>Paiement attendu</value></data>
+  <data name="Paid" xml:space="preserve"><value>Payée</value></data>
+  <data name="Late" xml:space="preserve"><value>En retard</value></data>
+  <data name="Closed" xml:space="preserve"><value>Clôturée</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="Approval required" xml:space="preserve"><value>Validation attendue</value></data>
+  <data name="Payment required" xml:space="preserve"><value>Paiement attendu</value></data>
+  <data name="Penalty risk" xml:space="preserve"><value>Risque de pénalité</value></data>
+  <data name="Upcoming" xml:space="preserve"><value>À venir</value></data>
+  <data name="Today" xml:space="preserve"><value>Aujourd’hui</value></data>
+  <data name="This week" xml:space="preserve"><value>Cette semaine</value></data>
+  <data name="This month" xml:space="preserve"><value>Ce mois</value></data>
+  <data name="Later" xml:space="preserve"><value>Plus tard</value></data>
+  <data name="Within 5 days" xml:space="preserve"><value>Sous 5 jours</value></data>
+  <data name="No items" xml:space="preserve"><value>Aucun dossier</value></data>
+  <data name="No primary owner" xml:space="preserve"><value>Aucun responsable principal</value></data>
+  <data name="Missing owner" xml:space="preserve"><value>Responsable manquant</value></data>
+</root>

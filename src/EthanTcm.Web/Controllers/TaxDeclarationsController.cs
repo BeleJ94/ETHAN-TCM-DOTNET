@@ -337,6 +337,22 @@ public sealed class TaxDeclarationsController(
         return ExecuteWorkflowAction(model.TaxDeclarationId, () => workflowService.CancelAsync(model.TaxDeclarationId, cancellationToken));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = ApplicationPermissions.ManageTaxDeclarationLifecycle)]
+    public Task<IActionResult> ReturnToPreviousStep(TaxDeclarationActionViewModel model, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(model.CorrectionReason))
+        {
+            return Task.FromResult(WorkflowResponse(model.TaxDeclarationId, false, "A correction reason is required."));
+        }
+
+        return ExecuteWorkflowAction(
+            model.TaxDeclarationId,
+            () => workflowService.ReturnToPreviousStepAsync(model.TaxDeclarationId, model.CorrectionReason, cancellationToken),
+            "The declaration was returned to the previous step.");
+    }
+
     private async Task<IActionResult> ExecuteWorkflowAction(
         Guid taxDeclarationId,
         Func<Task<TaxDeclarationWorkflowResult>> action,
@@ -382,8 +398,6 @@ public sealed class TaxDeclarationsController(
             ? success ? "Workflow action completed." : "The action could not be completed."
             : message;
 
-        TempData["StatusMessage"] = safeMessage;
-
         if (IsAjaxRequest())
         {
             return Json(new
@@ -394,6 +408,7 @@ public sealed class TaxDeclarationsController(
             });
         }
 
+        TempData["StatusMessage"] = safeMessage;
         return RedirectToAction(nameof(Details), new { id = taxDeclarationId });
     }
 

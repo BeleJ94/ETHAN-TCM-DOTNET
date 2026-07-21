@@ -80,6 +80,9 @@ public sealed class TaxDeclarationActionViewModel
     [StringLength(1000)]
     public string ReassignmentComment { get; set; } = string.Empty;
 
+    [StringLength(1000)]
+    public string CorrectionReason { get; set; } = string.Empty;
+
     public DocumentType DocumentType { get; set; } = DocumentType.SubmissionProof;
 
     [StringLength(256)]

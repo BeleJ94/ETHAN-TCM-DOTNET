@@ -15,15 +15,29 @@ public sealed class AccessAdministrationController(IAccessAdministrationService 
     public async Task<IActionResult> Details(Guid id, CancellationToken ct)
     {
         var user = await service.GetUserAsync(id, ct); if (user is null) return NotFound();
-        return View(new AccessUserEditViewModel { User = user, IsActive = user.IsActive, RoleIds = user.Roles.Where(x => x.Selected).Select(x => x.Id).ToArray() });
+        return View(new AccessUserEditViewModel { User = user, UserId = user.Id, IsActive = user.IsActive, PreferredCulture = user.PreferredCulture, RoleIds = user.Roles.Where(x => x.Selected).Select(x => x.Id).ToArray() });
     }
 
     [HttpPost, Authorize(Policy = ApplicationPermissions.ManageUsers)]
     public async Task<IActionResult> UpdateUser(AccessUserEditViewModel model, CancellationToken ct)
     {
-        var result = await service.UpdateUserAsync(model.User.Id, model.IsActive, model.RoleIds, model.Reason, ct);
+        var isAjax = Request.Headers.XRequestedWith == "XMLHttpRequest";
+        if (!ModelState.IsValid)
+        {
+            var message = ModelState.Values
+                .SelectMany(value => value.Errors)
+                .Select(error => error.ErrorMessage)
+                .FirstOrDefault() ?? "Please correct the form before submitting.";
+
+            if (isAjax) return BadRequest(new { success = false, message });
+            TempData["StatusMessage"] = message; TempData["StatusType"] = "danger";
+            return RedirectToAction(nameof(Details), new { id = model.UserId });
+        }
+
+        var result = await service.UpdateUserAsync(model.UserId, model.IsActive, model.RoleIds, model.PreferredCulture, model.Reason, ct);
+        if (isAjax) return StatusCode(result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest, new { success = result.Success, message = result.Message });
         TempData["StatusMessage"] = result.Message; TempData["StatusType"] = result.Success ? "success" : "danger";
-        return RedirectToAction(nameof(Details), new { id = model.User.Id });
+        return RedirectToAction(nameof(Details), new { id = model.UserId });
     }
 
     public async Task<IActionResult> Roles(CancellationToken ct) => View(new AccessRolesViewModel { Roles = await service.GetRoleMatrixAsync(ct) });

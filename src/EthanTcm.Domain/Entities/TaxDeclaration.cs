@@ -88,7 +88,10 @@ public sealed class TaxDeclaration : AuditableEntity
             throw new DomainException("Only declarations in preparation or rejected can be submitted for review.");
         }
 
-        ApprovalCycleNumber++;
+        if (ApprovalCycleNumber == 0 || _approvals.Any(approval => approval.ApprovalCycleNumber == ApprovalCycleNumber))
+        {
+            ApprovalCycleNumber++;
+        }
         Status = TaxDeclarationStatus.SubmittedForReview;
         PreparedAt = timestamp;
         MarkUpdated(timestamp);
@@ -265,6 +268,52 @@ public sealed class TaxDeclaration : AuditableEntity
     {
         EnsureNotClosed();
         Status = TaxDeclarationStatus.Cancelled;
+        MarkUpdated(timestamp);
+    }
+
+    public void ReturnToPreviousStep(DateTimeOffset timestamp)
+    {
+        var previousStatus = Status;
+        Status = previousStatus switch
+        {
+            TaxDeclarationStatus.InPreparation => TaxDeclarationStatus.ToPrepare,
+            TaxDeclarationStatus.SubmittedForReview => TaxDeclarationStatus.InPreparation,
+            TaxDeclarationStatus.ApprovedLevel1 or
+            TaxDeclarationStatus.ApprovedLevel2 or
+            TaxDeclarationStatus.ApprovedLevel3 or
+            TaxDeclarationStatus.ReadyForSubmission or
+            TaxDeclarationStatus.Rejected => TaxDeclarationStatus.Rejected,
+            TaxDeclarationStatus.Submitted or
+            TaxDeclarationStatus.PaymentPending => TaxDeclarationStatus.ReadyForSubmission,
+            TaxDeclarationStatus.Paid => throw new DomainException("A paid declaration requires a formal payment correction and cannot be returned automatically."),
+            TaxDeclarationStatus.Closed => throw new DomainException("A closed declaration cannot be returned automatically."),
+            TaxDeclarationStatus.Cancelled => throw new DomainException("A cancelled declaration cannot be returned automatically."),
+            TaxDeclarationStatus.NotApplicable => throw new DomainException("A declaration marked not applicable cannot be returned automatically."),
+            TaxDeclarationStatus.ToPrepare => throw new DomainException("The declaration is already at the first workflow step."),
+            _ => throw new DomainException("The declaration cannot be returned from its current status.")
+        };
+
+        if (previousStatus is TaxDeclarationStatus.ApprovedLevel1 or
+            TaxDeclarationStatus.ApprovedLevel2 or
+            TaxDeclarationStatus.ApprovedLevel3 or
+            TaxDeclarationStatus.ReadyForSubmission or
+            TaxDeclarationStatus.Rejected)
+        {
+            ApprovalCycleNumber++;
+        }
+
+        if (Status == TaxDeclarationStatus.ToPrepare)
+        {
+            PreparedAt = null;
+        }
+
+        if (Status == TaxDeclarationStatus.ReadyForSubmission)
+        {
+            SubmissionReference = null;
+            SubmittedAt = null;
+            SubmittedByUserId = null;
+        }
+
         MarkUpdated(timestamp);
     }
 

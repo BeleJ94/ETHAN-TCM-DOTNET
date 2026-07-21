@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\EthanTcm.Domain\EthanTcm.Domain.csproj" />
     <ProjectReference Include="..\..\src\EthanTcm.Application\EthanTcm.Application.csproj" />
     <ProjectReference Include="..\..\src\EthanTcm.Infrastructure\EthanTcm.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\EthanTcm.Web\EthanTcm.Web.csproj" />
   </ItemGroup>
 
 </Project>

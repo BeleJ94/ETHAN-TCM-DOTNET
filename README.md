@@ -108,6 +108,14 @@ Pour IIS :
 - configurer la connection string de production ;
 - verifier les droits du pool applicatif sur les ressources necessaires.
 
+## Langues de l'interface
+
+- L'anglais (`en`) est la langue par defaut.
+- Le francais (`fr`) est disponible via les ressources de localisation ASP.NET Core.
+- La langue est definie par utilisateur dans `Administration > Access management > User details`.
+- La preference est appliquee automatiquement a la prochaine authentification de l'utilisateur.
+- Les nouveaux utilisateurs et les comptes existants sans preference explicite utilisent l'anglais.
+
 ## Tests
 
 ```powershell
@@ -131,3 +139,16 @@ dotnet test EthanTcm.sln
 - les commandes SQL EF Core ne sont plus journalisees au niveau `Information` ;
 - la migration `AddPerformanceIndexes` ajoute les index composites utilises par
   les declarations et les preuves documentaires.
+
+## Experience mobile
+
+- La navigation principale se replie sous 992 px et une barre d'actions rapide
+  est affichee sous 768 px.
+- Les tableaux operationnels sont automatiquement transformes en cartes sous
+  768 px, y compris dans les contenus charges en AJAX.
+- Les grandes modales deviennent plein ecran sur telephone.
+- Les formulaires, filtres, actions et paginations s'empilent sur petit ecran.
+- Les cibles tactiles importantes ont une hauteur minimale de 44 px.
+- Les zones sures iOS, les textes longs et la reduction des animations sont pris
+  en charge.
+- Les breakpoints de verification sont 320, 375, 430, 768, 1024 et 1440 px.

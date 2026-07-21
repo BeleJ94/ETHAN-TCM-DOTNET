@@ -4,6 +4,8 @@ namespace EthanTcm.Domain.Entities;
 
 public sealed class User : AuditableEntity
 {
+    public const string DefaultCulture = "en";
+    public static readonly IReadOnlySet<string> SupportedCultures = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "en", "fr" };
     private readonly List<UserRole> _roles = [];
 
     private User()
@@ -27,6 +29,7 @@ public sealed class User : AuditableEntity
     public DateTimeOffset? DelegationStartsAt { get; private set; }
     public DateTimeOffset? DelegationEndsAt { get; private set; }
     public string? PreferencesJson { get; private set; }
+    public string PreferredCulture { get; private set; } = DefaultCulture;
     public DateTimeOffset? LastSyncedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
     public IReadOnlyCollection<UserRole> Roles => _roles.AsReadOnly();
@@ -106,6 +109,18 @@ public sealed class User : AuditableEntity
     public void SetPreferences(string? preferencesJson, DateTimeOffset timestamp)
     {
         PreferencesJson = preferencesJson;
+        MarkUpdated(timestamp);
+    }
+
+    public void SetPreferredCulture(string culture, DateTimeOffset timestamp)
+    {
+        var normalized = culture.Trim().ToLowerInvariant();
+        if (!SupportedCultures.Contains(normalized))
+        {
+            throw new DomainException($"Unsupported culture '{culture}'.");
+        }
+
+        PreferredCulture = normalized;
         MarkUpdated(timestamp);
     }
 

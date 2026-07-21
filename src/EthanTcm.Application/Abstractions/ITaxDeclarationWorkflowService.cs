@@ -19,6 +19,7 @@ public interface ITaxDeclarationWorkflowService
     Task<TaxDeclarationWorkflowResult> ReassignAsync(TaxDeclarationReassignmentCommand command, CancellationToken cancellationToken = default);
     Task<TaxDeclarationWorkflowResult> CloseAsync(Guid taxDeclarationId, CancellationToken cancellationToken = default);
     Task<TaxDeclarationWorkflowResult> CancelAsync(Guid taxDeclarationId, CancellationToken cancellationToken = default);
+    Task<TaxDeclarationWorkflowResult> ReturnToPreviousStepAsync(Guid taxDeclarationId, string reason, CancellationToken cancellationToken = default);
 }
 
 public sealed record TaxDeclarationWorkflowResult(

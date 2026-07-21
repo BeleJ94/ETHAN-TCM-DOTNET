@@ -5,4 +5,5 @@ public static class EthanTcmClaimTypes
     public const string UserId = "ethan_tcm:user_id";
     public const string Login = "ethan_tcm:login";
     public const string Permission = "ethan_tcm:permission";
+    public const string PreferredCulture = "ethan_tcm:preferred_culture";
 }

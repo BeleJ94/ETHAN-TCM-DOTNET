@@ -55,23 +55,25 @@ public sealed class AccessAdministrationService(EthanTcmDbContext db, ICurrentUs
         var selectedRoleIds = await db.UserRoles.AsNoTracking().Where(x => x.UserId == id).Select(x => x.RoleId).ToArrayAsync(ct);
         var roles = await db.Roles.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new AccessRoleOption(x.Id, x.Code, x.Name, selectedRoleIds.Contains(x.Id))).ToListAsync(ct);
         var permissions = await (from ur in db.UserRoles.AsNoTracking() join rp in db.RolePermissions.AsNoTracking() on ur.RoleId equals rp.RoleId join p in db.Permissions.AsNoTracking() on rp.PermissionId equals p.Id where ur.UserId == id && p.IsActive select p.Code).Distinct().OrderBy(x => x).ToListAsync(ct);
-        return new(user.Id, user.Login, user.DisplayName, user.Email, user.ExternalId, user.IsActive, user.LastSyncedAt, roles, permissions);
+        return new(user.Id, user.Login, user.DisplayName, user.Email, user.ExternalId, user.IsActive, user.PreferredCulture, user.LastSyncedAt, roles, permissions);
     }
 
-    public async Task<AccessOperationResult> UpdateUserAsync(Guid id, bool isActive, IReadOnlyCollection<Guid> roleIds, string reason, CancellationToken ct = default)
+    public async Task<AccessOperationResult> UpdateUserAsync(Guid id, bool isActive, IReadOnlyCollection<Guid> roleIds, string preferredCulture, string reason, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(reason)) return new(false, "A reason is required for every access change.");
+        if (!User.SupportedCultures.Contains(preferredCulture)) return new(false, "The selected interface language is not supported.");
         var user = await db.Users.Include(x => x.Roles).FirstOrDefaultAsync(x => x.Id == id, ct); if (user is null) return new(false, "User not found.");
         var validRoleIds = await db.Roles.Where(x => x.IsActive && roleIds.Contains(x.Id)).Select(x => x.Id).ToArrayAsync(ct);
         var adminRoleId = await db.Roles.Where(x => x.Code == ApplicationRoles.Administrator).Select(x => x.Id).SingleAsync(ct);
         var removesAdministrator = user.Roles.Any(x => x.RoleId == adminRoleId) && (!isActive || !validRoleIds.Contains(adminRoleId));
         if (removesAdministrator && await ActiveAdministratorCount(ct) <= 1) return new(false, "The last active administrator cannot be disabled or demoted.");
         if (currentUser.UserId == id && removesAdministrator) return new(false, "You cannot remove your own active administrator access.");
-        var oldRoles = user.Roles.Select(x => x.RoleId).ToArray(); var oldActive = user.IsActive;
+        var oldRoles = user.Roles.Select(x => x.RoleId).ToArray(); var oldActive = user.IsActive; var oldCulture = user.PreferredCulture;
         user.ReplaceRoles(validRoleIds, DateTimeOffset.UtcNow);
+        user.SetPreferredCulture(preferredCulture, DateTimeOffset.UtcNow);
         foreach (var assignment in user.Roles.Where(x => !oldRoles.Contains(x.RoleId))) db.Entry(assignment).State = EntityState.Added;
         if (isActive) user.Activate(DateTimeOffset.UtcNow); else user.Deactivate(DateTimeOffset.UtcNow);
-        audit.Add(new("UpdateAccess", nameof(User), id.ToString(), new { IsActive = oldActive, RoleIds = oldRoles }, new { IsActive = isActive, RoleIds = validRoleIds, Reason = reason.Trim() }, "Access Administration", "Web"));
+        audit.Add(new("UpdateAccess", nameof(User), id.ToString(), new { IsActive = oldActive, RoleIds = oldRoles, PreferredCulture = oldCulture }, new { IsActive = isActive, RoleIds = validRoleIds, PreferredCulture = user.PreferredCulture, Reason = reason.Trim() }, "Access Administration", "Web"));
         await db.SaveChangesAsync(ct); return new(true, "User access updated successfully.");
     }
 

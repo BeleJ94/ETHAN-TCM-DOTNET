@@ -1,5 +1,6 @@
 @model DashboardMetricDetailsDto
 @using Microsoft.AspNetCore.Routing
+@inject IStringLocalizer<SharedResource> Localizer
 
 @{
     var excelRoute = new RouteValueDictionary
@@ -47,9 +48,9 @@
 
 <div class="kpi-detail-header">
     <div>
-        <span class="eyebrow">Indicator breakdown</span>
-        <h2 class="h5 mb-1">@Model.Title</h2>
-        <p>@Model.Definition</p>
+        <span class="eyebrow">@Localizer["Indicator breakdown"]</span>
+        <h2 class="h5 mb-1">@Localizer[Model.Title]</h2>
+        <p>@Localizer[Model.Definition]</p>
     </div>
     <div class="kpi-detail-actions">
         <div class="kpi-detail-total">
@@ -83,13 +84,13 @@ else
         <table class="table table-sm align-middle">
             <thead>
             <tr>
-                <th>Tax</th>
-                <th>Period</th>
-                <th>Deadline</th>
-                <th>Status</th>
-                <th>Risk</th>
-                <th>Owner</th>
-                <th>Expected action</th>
+                <th>@Localizer["Tax"]</th>
+                <th>@Localizer["Period"]</th>
+                <th>@Localizer["Deadline"]</th>
+                <th>@Localizer["Status"]</th>
+                <th>@Localizer["Risk"]</th>
+                <th>@Localizer["Owner"]</th>
+                <th>@Localizer["Expected action"]</th>
                 <th></th>
             </tr>
             </thead>
@@ -110,24 +111,24 @@ else
                             <small class="d-block text-danger">@item.DaysLate day(s) late</small>
                         }
                     </td>
-                    <td>@item.Status</td>
+                    <td>@Localizer[item.Status]</td>
                     <td>@item.RiskLevel</td>
-                    <td>@(item.AssignedTo ?? "Unassigned")</td>
-                    <td><span class="status-pill @issueClass">@item.Issue</span></td>
+                    <td>@(item.AssignedTo ?? Localizer["Unassigned"].Value)</td>
+                    <td><span class="status-pill @issueClass">@Localizer[item.Issue]</span></td>
                     <td class="text-end">
                         @if (item.TargetType == DashboardDetailTargetType.TaxDeclaration)
                         {
                             <a class="btn btn-sm btn-outline-primary"
                                asp-controller="TaxDeclarations"
                                asp-action="Details"
-                               asp-route-id="@item.Id">Open</a>
+                               asp-route-id="@item.Id">@Localizer["Open"]</a>
                         }
                         else
                         {
                             <a class="btn btn-sm btn-outline-primary"
                                asp-controller="TaxObligations"
                                asp-action="Details"
-                               asp-route-id="@item.Id">Open</a>
+                               asp-route-id="@item.Id">@Localizer["Open"]</a>
                         }
                     </td>
                 </tr>
@@ -141,8 +142,8 @@ else
     <span>Page @Model.Page of @Model.TotalPages</span>
     <div class="data-table-pagination">
         <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page <= 1 ? "disabled" : null)"
-           href="@Url.Action(Model.DetailAction, "Home", previousRoute)">Previous</a>
+           href="@Url.Action(Model.DetailAction, "Home", previousRoute)">@Localizer["Previous"]</a>
         <a class="btn btn-outline-secondary btn-sm js-kpi-page @(Model.Page >= Model.TotalPages ? "disabled" : null)"
-           href="@Url.Action(Model.DetailAction, "Home", nextRoute)">Next</a>
+           href="@Url.Action(Model.DetailAction, "Home", nextRoute)">@Localizer["Next"]</a>
     </div>
 </div>

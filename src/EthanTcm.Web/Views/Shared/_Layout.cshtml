@@ -42,7 +42,7 @@
 }
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -405,6 +405,42 @@
     <main role="main" class="app-main">
         @RenderBody()
     </main>
+
+    <nav class="mobile-bottom-nav" aria-label="Mobile primary navigation">
+        <a class="@(isMainDashboardActive ? "active" : string.Empty)" asp-controller="Home" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
+            <span>Dashboard</span>
+        </a>
+        <a asp-controller="Home" asp-action="Index" asp-route-view="@DashboardView.MyTasks">
+            <svg class="icon" aria-hidden="true"><use href="#icon-list"></use></svg>
+            <span>My tasks</span>
+        </a>
+        @if (canCreateCorrespondence)
+        {
+            <a class="mobile-bottom-primary" asp-controller="Correspondences" asp-action="Create" asp-route-direction="Outgoing">
+                <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+                <span>New</span>
+            </a>
+        }
+        else if (canCreateDeclarations)
+        {
+            <a class="mobile-bottom-primary" asp-controller="TaxDeclarations" asp-action="Manual">
+                <svg class="icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+                <span>New</span>
+            </a>
+        }
+        @if (hasPaymentsMenu)
+        {
+            <a class="@(isPaymentsActive ? "active" : string.Empty)" asp-controller="Payments" asp-action="Pending">
+                <svg class="icon" aria-hidden="true"><use href="#icon-credit-card"></use></svg>
+                <span>Payments</span>
+            </a>
+        }
+        <a class="@(activeController == "Account" ? "active" : string.Empty)" asp-controller="Account" asp-action="Profile">
+            <svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg>
+            <span>Profile</span>
+        </a>
+    </nav>
 
     <footer class="app-footer">
         <div>

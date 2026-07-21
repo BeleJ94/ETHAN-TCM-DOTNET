@@ -4,15 +4,18 @@ using EthanTcm.Application.Authentication;
 using EthanTcm.Infrastructure;
 using EthanTcm.Web.Authentication;
 using EthanTcm.Web.Services;
+using EthanTcm.Web.Localization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Server.IISIntegration;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +58,7 @@ builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
 builder.Services.Configure<GzipCompressionProviderOptions>(options =>
     options.Level = CompressionLevel.Fastest);
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 builder.Services.AddScoped<ICurrentUser, WebCurrentUser>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IAuditRequestContext, WebAuditRequestContext>();
@@ -100,7 +104,27 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
-});
+})
+.AddViewLocalization()
+.AddDataAnnotationsLocalization();
+
+var supportedCultures = new[]
+{
+    CultureInfo.GetCultureInfo("en"),
+    CultureInfo.GetCultureInfo("fr")
+};
+var localizationOptions = new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture("en"),
+    SupportedCultures = supportedCultures,
+    SupportedUICultures = supportedCultures,
+    FallBackToParentCultures = true,
+    FallBackToParentUICultures = true
+};
+localizationOptions.RequestCultureProviders =
+[
+    new UserClaimRequestCultureProvider()
+];
 
 var app = builder.Build();
 
@@ -188,6 +212,7 @@ app.Use(async (context, next) =>
     context.User = await claimsTransformation.TransformAsync(context.User);
     await next();
 });
+app.UseRequestLocalization(localizationOptions);
 app.UseAuthorization();
 
 app.MapStaticAssets();

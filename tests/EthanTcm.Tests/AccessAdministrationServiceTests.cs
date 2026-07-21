@@ -27,7 +27,7 @@ public sealed class AccessAdministrationServiceTests
         await using var db = CreateDb(); var service = CreateService(db); await service.EnsureCatalogAsync();
         var adminRole = await db.Roles.SingleAsync(x => x.Code == ApplicationRoles.Administrator);
         var user = new User("admin", "Administrator", "admin@local"); user.AssignRole(adminRole.Id, DateTimeOffset.UtcNow); db.Users.Add(user); await db.SaveChangesAsync();
-        var result = await service.UpdateUserAsync(user.Id, false, [], "Test demotion");
+        var result = await service.UpdateUserAsync(user.Id, false, [], "en", "Test demotion");
         Assert.False(result.Success); Assert.Contains("last active administrator", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -37,8 +37,9 @@ public sealed class AccessAdministrationServiceTests
         await using var db = CreateDb(); var service = CreateService(db); await service.EnsureCatalogAsync();
         var preparer = await db.Roles.SingleAsync(x => x.Code == ApplicationRoles.Preparer);
         var user = new User("employee", "Employee", "employee@local"); db.Users.Add(user); await db.SaveChangesAsync();
-        var result = await service.UpdateUserAsync(user.Id, true, [preparer.Id], "New tax preparation responsibility");
+        var result = await service.UpdateUserAsync(user.Id, true, [preparer.Id], "fr", "New tax preparation responsibility");
         Assert.True(result.Success); Assert.True(await db.UserRoles.AnyAsync(x => x.UserId == user.Id && x.RoleId == preparer.Id));
+        Assert.Equal("fr", (await db.Users.FindAsync(user.Id))!.PreferredCulture);
         Assert.True(await db.AuditLogs.AnyAsync(x => x.EntityId == user.Id.ToString() && x.Action == "UpdateAccess"));
     }
 

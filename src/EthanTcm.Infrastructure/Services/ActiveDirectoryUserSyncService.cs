@@ -101,6 +101,7 @@ public sealed class ActiveDirectoryUserSyncService(
         var identity = new System.Security.Claims.ClaimsIdentity("EthanTcmUserSync");
         identity.AddClaim(new System.Security.Claims.Claim(EthanTcmClaimTypes.UserId, user.Id.ToString()));
         identity.AddClaim(new System.Security.Claims.Claim(EthanTcmClaimTypes.Login, user.Login));
+        identity.AddClaim(new System.Security.Claims.Claim(EthanTcmClaimTypes.PreferredCulture, user.PreferredCulture));
         identity.AddClaim(new System.Security.Claims.Claim(ClaimTypes.NameIdentifier, user.Login));
         identity.AddClaim(new System.Security.Claims.Claim(ClaimTypes.Name, user.DisplayName));
         identity.AddClaim(new System.Security.Claims.Claim(ClaimTypes.Email, user.Email));

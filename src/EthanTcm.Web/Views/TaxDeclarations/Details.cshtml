@@ -740,6 +740,25 @@
             {
                 <section class="panel">
                     <h2>Lifecycle controls</h2>
+                    @if (declaration.Status is TaxDeclarationStatus.InPreparation
+                        or TaxDeclarationStatus.SubmittedForReview
+                        or TaxDeclarationStatus.ApprovedLevel1
+                        or TaxDeclarationStatus.ApprovedLevel2
+                        or TaxDeclarationStatus.ApprovedLevel3
+                        or TaxDeclarationStatus.ReadyForSubmission
+                        or TaxDeclarationStatus.Rejected
+                        or TaxDeclarationStatus.Submitted
+                        or TaxDeclarationStatus.PaymentPending)
+                    {
+                        <form method="post" asp-action="ReturnToPreviousStep" class="operational-action-form js-confirm-ajax-form mb-3" data-confirm-title="Return to previous step">
+                            <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />
+                            <div>
+                                <label class="form-label" for="CorrectionReason">Mandatory correction reason</label>
+                                <textarea id="CorrectionReason" class="form-control" name="CorrectionReason" rows="3" maxlength="1000" required placeholder="Explain the error and the correction required"></textarea>
+                            </div>
+                            <button class="btn btn-outline-warning" type="submit"><svg class="icon"><use href="#icon-arrow-left"></use></svg>Return to previous step</button>
+                        </form>
+                    }
                     <div class="form-actions lifecycle-actions">
                         <form method="post" asp-action="Cancel" class="js-confirm-ajax-form" data-confirm-title="Cancel declaration">
                             <input type="hidden" name="TaxDeclarationId" value="@declaration.Id" />

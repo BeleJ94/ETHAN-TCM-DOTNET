@@ -64,6 +64,51 @@ public sealed class TaxDeclarationDomainTests
         Assert.Equal(TaxDeclarationStatus.ReadyForSubmission, declaration.Status);
     }
 
+    [Fact]
+    public void Submitted_declaration_can_be_returned_for_submission_correction()
+    {
+        var declaration = CreateSubmittedDeclaration(paymentRequired: false);
+
+        declaration.ReturnToPreviousStep(DateTimeOffset.UtcNow);
+
+        Assert.Equal(TaxDeclarationStatus.ReadyForSubmission, declaration.Status);
+        Assert.Null(declaration.SubmissionReference);
+        Assert.Null(declaration.SubmittedAt);
+        Assert.Null(declaration.SubmittedByUserId);
+    }
+
+    [Fact]
+    public void Paid_declaration_requires_formal_financial_correction()
+    {
+        var declaration = CreateSubmittedDeclaration(paymentRequired: true);
+        declaration.AddPayment(100m, "USD", "PAY-001", DateTimeOffset.UtcNow);
+
+        Assert.Throws<DomainException>(() => declaration.ReturnToPreviousStep(DateTimeOffset.UtcNow));
+        Assert.Equal(TaxDeclarationStatus.Paid, declaration.Status);
+    }
+
+    [Fact]
+    public void Returning_an_approval_archives_the_old_cycle_and_starts_clean_review()
+    {
+        var declaration = CreateDeclaration(paymentRequired: false);
+        declaration.StartPreparation(DateTimeOffset.UtcNow);
+        declaration.SubmitForReview(DateTimeOffset.UtcNow);
+        declaration.ApproveNextLevel(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var archivedCycle = declaration.ApprovalCycleNumber;
+
+        declaration.ReturnToPreviousStep(DateTimeOffset.UtcNow);
+
+        Assert.Equal(TaxDeclarationStatus.Rejected, declaration.Status);
+        Assert.Equal(archivedCycle + 1, declaration.ApprovalCycleNumber);
+        Assert.DoesNotContain(declaration.Approvals, approval => approval.ApprovalCycleNumber == declaration.ApprovalCycleNumber);
+
+        declaration.SubmitForReview(DateTimeOffset.UtcNow);
+
+        Assert.Equal(TaxDeclarationStatus.SubmittedForReview, declaration.Status);
+        Assert.Equal(archivedCycle + 1, declaration.ApprovalCycleNumber);
+        Assert.Equal(1, declaration.NextApprovalLevel());
+    }
+
     private static TaxDeclaration CreateSubmittedDeclaration(bool paymentRequired)
     {
         var declaration = CreateDeclaration(paymentRequired);

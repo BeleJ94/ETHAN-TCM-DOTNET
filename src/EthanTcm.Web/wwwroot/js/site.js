@@ -263,9 +263,42 @@
     render();
   };
 
+  const enhanceResponsiveTable = (table) => {
+    if (table.classList.contains("no-mobile-cards") || table.dataset.responsiveReady === "true") {
+      return;
+    }
+
+    const headings = Array.from(table.querySelectorAll("thead th"))
+      .map((heading) => heading.textContent.replace(/\s+/g, " ").trim());
+    if (headings.length === 0) {
+      return;
+    }
+
+    table.classList.add("mobile-card-table");
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      const cells = Array.from(row.cells);
+      if (cells.length === 1 && cells[0].colSpan > 1) {
+        row.classList.add("mobile-card-empty-row");
+        return;
+      }
+
+      cells.forEach((cell, index) => {
+        const label = headings[index] || "";
+        cell.dataset.label = label;
+        if (!label) cell.classList.add("mobile-card-action");
+      });
+    });
+    table.dataset.responsiveReady = "true";
+  };
+
   const initialize = (root = document) => {
+    root.querySelectorAll(".table-responsive table").forEach(enhanceResponsiveTable);
     root.querySelectorAll(".js-data-table").forEach(enhanceTable);
   };
+
+  // Partials loaded asynchronously (for example dashboard details) need the
+  // same responsive/table enhancements as the initial document.
+  window.ethanTcmInitialize = initialize;
 
   const getFieldLabel = (field) => {
     if (field.id) {
@@ -331,6 +364,7 @@
           field.type === "hidden" ||
           field.type === "submit" ||
           field.type === "button" ||
+          field.dataset.confirmIgnore === "true" ||
           field.name === "__RequestVerificationToken") {
         return;
       }
@@ -479,8 +513,7 @@
     const currentDetails = document.querySelector(".declaration-details");
 
     if (!response.ok || !nextDetails || !currentDetails) {
-      window.location.assign(url);
-      return;
+      throw new Error("The declaration details could not be refreshed.");
     }
 
     currentDetails.replaceWith(nextDetails);
@@ -511,8 +544,13 @@
         showActionAlert(payload.message || "The action was completed successfully.", true);
         window.setTimeout(() => window.location.assign(payload.redirectUrl), 450);
       } else if (payload.success && payload.refreshUrl) {
-        window.location.assign(payload.refreshUrl);
+        await refreshDeclarationDetails(payload.refreshUrl);
+        showActionAlert(payload.message || "The action was completed successfully.", true);
       } else if (payload.success) {
+        if (form.dataset.ajaxResetReason === "true") {
+          const reason = form.querySelector("[name='Reason']");
+          if (reason) reason.value = "";
+        }
         showActionAlert(payload.message || "The action was completed successfully.", true);
       } else {
         showActionAlert(payload.message || "The action could not be completed.", false);
@@ -593,20 +631,21 @@
   const modalTitle = modalElement.querySelector(".modal-title");
   const modal = new window.bootstrap.Modal(modalElement);
   let requestController = null;
+  const isFrench = document.documentElement.lang.toLowerCase().startsWith("fr");
 
   const renderLoading = () => {
     modalBody.innerHTML = `
       <div class="kpi-modal-loading">
         <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-        <span>Loading details…</span>
+        <span>${isFrench ? "Chargement du détail…" : "Loading details…"}</span>
       </div>`;
   };
 
   const renderError = () => {
     modalBody.innerHTML = `
       <div class="kpi-modal-error" role="alert">
-        <strong>The details could not be loaded.</strong>
-        <span>Close this window and try again.</span>
+        <strong>${isFrench ? "Le détail n’a pas pu être chargé." : "The details could not be loaded."}</strong>
+        <span>${isFrench ? "Fermez cette fenêtre puis réessayez." : "Close this window and try again."}</span>
       </div>`;
   };
 
@@ -625,8 +664,9 @@
       }
 
       modalBody.innerHTML = await response.text();
+      window.ethanTcmInitialize?.(modalBody);
       const detailTitle = modalBody.querySelector(".kpi-detail-header h2");
-      modalTitle.textContent = detailTitle?.textContent?.trim() || "KPI details";
+      modalTitle.textContent = detailTitle?.textContent?.trim() || (isFrench ? "Détail du KPI" : "KPI details");
     } catch (error) {
       if (error.name !== "AbortError") {
         renderError();
@@ -638,7 +678,7 @@
     const card = event.target.closest(".js-kpi-card");
     if (card && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) {
       event.preventDefault();
-      modalTitle.textContent = "KPI details";
+      modalTitle.textContent = isFrench ? "Détail du KPI" : "KPI details";
       modal.show();
       loadDetails(card.dataset.kpiUrl);
       return;
@@ -657,7 +697,7 @@
       return;
     }
 
-    modalTitle.textContent = event.detail?.title || "Chart details";
+    modalTitle.textContent = event.detail?.title || (isFrench ? "Détail du graphique" : "Chart details");
     modal.show();
     loadDetails(url);
   });

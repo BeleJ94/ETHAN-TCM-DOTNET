@@ -32,6 +32,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.Email).HasMaxLength(256).IsRequired();
         builder.Property(user => user.ExternalId).HasMaxLength(256);
         builder.Property(user => user.PreferencesJson).HasColumnType("nvarchar(max)");
+        builder.Property(user => user.PreferredCulture).HasMaxLength(5).HasDefaultValue(User.DefaultCulture).IsRequired();
+        builder.ToTable(table => table.HasCheckConstraint("CK_Users_PreferredCulture", "[PreferredCulture] IN ('en', 'fr')"));
         builder.ToTable(table => table.HasCheckConstraint("CK_Users_PreferencesJson_Json", "[PreferencesJson] IS NULL OR ISJSON([PreferencesJson]) = 1"));
         builder.HasIndex(user => user.Login).IsUnique();
         builder.HasIndex(user => user.Email);

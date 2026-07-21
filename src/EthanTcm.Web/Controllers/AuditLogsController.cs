@@ -15,7 +15,7 @@ public sealed class AuditLogsController(IAuditService auditService) : Controller
         var items = await auditService.ListAsync(
             new AuditLogQuery(
                 model.Search,
-                model.Action,
+                model.ActionFilter,
                 model.EntityName,
                 model.From,
                 model.To),
@@ -24,7 +24,7 @@ public sealed class AuditLogsController(IAuditService auditService) : Controller
         return View(new AuditLogIndexViewModel
         {
             Search = model.Search,
-            Action = model.Action,
+            ActionFilter = model.ActionFilter,
             EntityName = model.EntityName,
             From = model.From,
             To = model.To,

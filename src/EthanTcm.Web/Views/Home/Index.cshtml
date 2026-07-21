@@ -2,6 +2,7 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Authorization
 @inject IAuthorizationService AuthorizationService
+@inject IStringLocalizer<SharedResource> Localizer
 @model DashboardViewModel
 
 @{
@@ -12,10 +13,10 @@
     var chartPayload = new
     {
         detailBaseUrl = Url.Action("ChartDetails", "Home", new { view = dashboard.ActiveView }),
-        dueDateBuckets = charts.DueDateBuckets,
-        statusDistribution = charts.StatusDistribution,
-        riskDistribution = charts.RiskDistribution,
-        ownerWorkload = charts.OwnerWorkload
+        dueDateBuckets = charts.DueDateBuckets.Select(point => new { point.Key, Label = Localizer[point.Label].Value, point.Value, point.Tone }),
+        statusDistribution = charts.StatusDistribution.Select(point => new { point.Key, Label = Localizer[point.Label].Value, point.Value, point.Tone }),
+        riskDistribution = charts.RiskDistribution.Select(point => new { point.Key, Label = Localizer[point.Label].Value, point.Value, point.Tone }),
+        ownerWorkload = charts.OwnerWorkload.Select(point => new { point.Key, point.Label, point.Value, point.Tone })
     };
     var chartPayloadJson = JsonSerializer.Serialize(chartPayload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
     var canGenerateDeclarations = (await AuthorizationService.AuthorizeAsync(User, ApplicationPermissions.GenerateTaxDeclarations)).Succeeded;
@@ -47,9 +48,9 @@
 <section class="page-shell dashboard-shell">
     <div class="page-heading">
         <div>
-            <span class="eyebrow">Tax management</span>
-            <h1>Decision dashboard</h1>
-            <p>Prioritize deadlines, approvals, payments and compliance issues.</p>
+            <span class="eyebrow">@Localizer["Tax management"]</span>
+            <h1>@Localizer["Decision dashboard"]</h1>
+            <p>@Localizer["Prioritize deadlines, approvals, payments and compliance issues."]</p>
         </div>
         @if (canGenerateDeclarations || canCreateDeclarations)
         {
@@ -68,48 +69,48 @@
 
     <nav class="dashboard-tabs" aria-label="Dashboard views">
         <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.MyTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.MyTasks">
-            <span>My tasks</span>
+            <span>@Localizer["My tasks"]</span>
             <small>Assigned to me</small>
         </a>
         <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.TeamTasks ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.TeamTasks">
-            <span>Team</span>
+            <span>@Localizer["Team"]</span>
             <small>Open workload</small>
         </a>
         <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ManagementOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ManagementOverview">
-            <span>Management</span>
+            <span>@Localizer["Management"]</span>
             <small>Global view</small>
         </a>
         <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.LateItems ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.LateItems">
-            <span>Late items</span>
+            <span>@Localizer["Late items"]</span>
             <small>Overdue deadlines</small>
         </a>
         <a class="dashboard-tab @(dashboard.ActiveView == DashboardView.ComplianceOverview ? "dashboard-tab-active" : string.Empty)" asp-action="Index" asp-route-view="@DashboardView.ComplianceOverview">
-            <span>Compliance</span>
+            <span>@Localizer["Compliance"]</span>
             <small>Risks and evidence</small>
         </a>
     </nav>
 
     <section class="dashboard-view-note" aria-label="Active filter">
-        <span>Active filter</span>
+        <span>@Localizer["Active filter"]</span>
         <strong>@activeViewLabel</strong>
         <p>@activeViewDescription</p>
     </section>
 
     <section class="dashboard-context-strip" aria-label="Dashboard context">
         <div>
-            <span>Active view</span>
+            <span>@Localizer["Active view"]</span>
             <strong>@activeViewLabel</strong>
         </div>
         <div>
-            <span>Open declarations</span>
+            <span>@Localizer["Open declarations"]</span>
             <strong>@metrics.OpenDeclarations</strong>
         </div>
         <div>
-            <span>Evidence coverage</span>
+            <span>@Localizer["Evidence coverage"]</span>
             <strong>@metrics.EvidenceComplianceRate.ToString("0.0") %</strong>
         </div>
         <div>
-            <span>Last refreshed</span>
+            <span>@Localizer["Last refreshed"]</span>
             <strong>@dashboard.GeneratedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong>
         </div>
     </section>
@@ -202,7 +203,7 @@
         <div class="dashboard-kpi-heading">
             <div>
                 <span class="eyebrow">Immediate decisions</span>
-                <h2 id="priority-kpis">Operational priorities</h2>
+                <h2 id="priority-kpis">@Localizer["Operational priorities"]</h2>
             </div>
             <p>Start with situations that require action today.</p>
         </div>
@@ -212,7 +213,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.Late })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
-                <span>Late declarations</span>
+                <span>@Localizer["Late declarations"]</span>
                 <strong>@metrics.Late</strong>
                 <small>Deadline missed, action required</small>
             </a>
@@ -221,7 +222,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueToday })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
-                <span>Due today</span>
+                <span>@Localizer["Due today"]</span>
                 <strong>@metrics.DueToday</strong>
                 <small>To be completed by end of day</small>
             </a>
@@ -230,7 +231,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.AwaitingApproval })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-check"></use></svg></span>
-                <span>Pending approvals</span>
+                <span>@Localizer["Pending approvals"]</span>
                 <strong>@metrics.AwaitingApproval</strong>
                 <small>Decisions blocking progress</small>
             </a>
@@ -239,7 +240,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.PendingPayments })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
-                <span>Pending payments</span>
+                <span>@Localizer["Pending payments"]</span>
                 <strong>@metrics.PendingPayments</strong>
                 <small>Payments requiring attention</small>
             </a>
@@ -250,7 +251,7 @@
         <div class="dashboard-kpi-heading">
             <div>
                 <span class="eyebrow">Risk control</span>
-                <h2 id="compliance-kpis">Compliance and exposure</h2>
+                <h2 id="compliance-kpis">@Localizer["Compliance and exposure"]</h2>
             </div>
             <p>Identify items that may lead to an issue or penalty.</p>
         </div>
@@ -260,7 +261,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.PenaltyRisk })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-alert"></use></svg></span>
-                <span>Penalty exposure</span>
+                <span>@Localizer["Penalty exposure"]</span>
                 <strong>@metrics.PenaltyRisk</strong>
                 <small>Late, high-risk or missing-evidence items</small>
             </a>
@@ -269,7 +270,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.MissingSubmissionProof })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-paperclip"></use></svg></span>
-                <span>Missing submission evidence</span>
+                <span>@Localizer["Missing submission evidence"]</span>
                 <strong>@metrics.MissingSubmissionProof</strong>
                 <small>Undocumented submissions</small>
             </a>
@@ -278,7 +279,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.MissingPaymentProof })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-credit-card"></use></svg></span>
-                <span>Missing payment evidence</span>
+                <span>@Localizer["Missing payment evidence"]</span>
                 <strong>@metrics.MissingPaymentProof</strong>
                 <small>Payments without active evidence</small>
             </a>
@@ -287,7 +288,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.ObligationsWithoutResponsible })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-user"></use></svg></span>
-                <span>Taxes without an owner</span>
+                <span>@Localizer["Taxes without an owner"]</span>
                 <strong>@metrics.ObligationsWithoutResponsible</strong>
                 <small>Ownership gap risk</small>
             </a>
@@ -298,7 +299,7 @@
         <div class="dashboard-kpi-heading">
             <div>
                 <span class="eyebrow">Planning ahead</span>
-                <h2 id="planning-kpis">Upcoming workload</h2>
+                <h2 id="planning-kpis">@Localizer["Upcoming workload"]</h2>
             </div>
             <p>Review the tax workload for the coming days and month.</p>
         </div>
@@ -308,7 +309,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueSoon })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-clock"></use></svg></span>
-                <span>Due within 5 days</span>
+                <span>@Localizer["Due within 5 days"]</span>
                 <strong>@metrics.DueInLessThanFiveDays</strong>
                 <small>Excluding items due today</small>
             </a>
@@ -317,7 +318,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueThisWeek })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-clock"></use></svg></span>
-                <span>Due this week</span>
+                <span>@Localizer["Due this week"]</span>
                 <strong>@metrics.DueThisWeek</strong>
                 <small>Calendar-week workload</small>
             </a>
@@ -326,7 +327,7 @@
                data-kpi-url="@Url.Action("KpiDetails", "Home", new { view = dashboard.ActiveView, metric = DashboardMetric.DueThisMonth })"
                aria-haspopup="dialog">
                 <span class="metric-icon"><svg class="icon icon-lg"><use href="#icon-calendar"></use></svg></span>
-                <span>Due this month</span>
+                <span>@Localizer["Due this month"]</span>
                 <strong>@metrics.DueThisMonth</strong>
                 <small>Calendar-month workload</small>
             </a>
@@ -345,13 +346,13 @@
             <table class="table table-sm align-middle dashboard-table js-data-table" data-page-size="10">
                 <thead>
                 <tr>
-                    <th>Tax</th>
-                    <th>Period</th>
-                    <th>Deadline</th>
-                    <th>Status</th>
-                    <th>Expected action</th>
-                    <th>Risk</th>
-                    <th>Owner</th>
+                    <th>@Localizer["Tax"]</th>
+                    <th>@Localizer["Period"]</th>
+                    <th>@Localizer["Deadline"]</th>
+                    <th>@Localizer["Status"]</th>
+                    <th>@Localizer["Expected action"]</th>
+                    <th>@Localizer["Risk"]</th>
+                    <th>@Localizer["Owner"]</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -382,7 +383,7 @@
                         <td>@item.RiskLevel</td>
                         <td>@item.AssignedTo</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" asp-controller="TaxDeclarations" asp-action="Details" asp-route-id="@item.Id"><svg class="icon"><use href="#icon-open"></use></svg>Open</a>
+                            <a class="btn btn-sm btn-outline-primary" asp-controller="TaxDeclarations" asp-action="Details" asp-route-id="@item.Id"><svg class="icon"><use href="#icon-open"></use></svg>@Localizer["Open"]</a>
                         </td>
                     </tr>
                 }
@@ -437,14 +438,14 @@
             <div class="modal-header">
                 <div>
                     <span class="eyebrow">Detailed analysis</span>
-                    <h2 class="modal-title fs-5" id="dashboard-kpi-modal-title">KPI details</h2>
+                    <h2 class="modal-title fs-5" id="dashboard-kpi-modal-title">@Localizer["KPI details"]</h2>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Localizer["Close"]"></button>
             </div>
             <div class="modal-body js-kpi-modal-body" aria-live="polite">
                 <div class="kpi-modal-loading">
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                    <span>Loading details…</span>
+                    <span>@Localizer["Loading details…"]</span>
                 </div>
             </div>
         </div>

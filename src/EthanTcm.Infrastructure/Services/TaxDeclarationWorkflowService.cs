@@ -396,6 +396,39 @@ public sealed class TaxDeclarationWorkflowService(
         }, cancellationToken);
     }
 
+    public Task<TaxDeclarationWorkflowResult> ReturnToPreviousStepAsync(Guid taxDeclarationId, string reason, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Task.FromResult(new TaxDeclarationWorkflowResult(false, "A correction reason is required."));
+        }
+
+        return ExecuteAsync(taxDeclarationId, "ReturnToPreviousStep", declaration =>
+        {
+            EnsureRole(ApplicationRoles.TaxManager, ApplicationRoles.Administrator);
+            var previousStatus = declaration.Status;
+            declaration.ReturnToPreviousStep(DateTimeOffset.UtcNow);
+
+            if (previousStatus is TaxDeclarationStatus.Submitted or TaxDeclarationStatus.PaymentPending)
+            {
+                foreach (var document in declaration.Documents.Where(document =>
+                             document.DocumentType == DocumentType.SubmissionProof && !document.IsDeleted))
+                {
+                    document.SoftDelete(RequireCurrentUserId(), DateTimeOffset.UtcNow);
+                }
+            }
+
+            auditService.Add(new AuditEntry(
+                "CorrectionReason",
+                nameof(TaxDeclaration),
+                declaration.Id.ToString(),
+                null,
+                new { Reason = reason.Trim(), PreviousStatus = previousStatus.ToString(), NewStatus = declaration.Status.ToString() },
+                AuditModule,
+                "Web"));
+        }, cancellationToken);
+    }
+
     private async Task<TaxDeclarationWorkflowResult> ExecuteAsync(
         Guid taxDeclarationId,
         string action,
